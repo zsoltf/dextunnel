@@ -1,0 +1,30 @@
+{
+  "name": "dextunnel",
+  "version": "0.1.0",
+  "description": "Transcript-first mobile companion for Codex.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "doctor": "node src/bin/doctor.mjs",
+    "native:host:archive": "cd native/apple && ./scripts/release-menubar-host.sh archive",
+    "native:host:export": "cd native/apple && ./scripts/release-menubar-host.sh export",
+    "native:host:notarize": "cd native/apple && ./scripts/release-menubar-host.sh notarize",
+    "native:host:release": "cd native/apple && ./scripts/release-menubar-host.sh release",
+    "start": "node src/server.mjs",
+    "start:network": "DEXTUNNEL_HOST=0.0.0.0 node src/server.mjs",
+    "dev": "node --watch src/server.mjs",
+    "launch:attest-manual": "node src/bin/launch-attest.mjs manual-pass",
+    "launch:check": "npm test && node src/bin/launch-attest.mjs automated-pass && node src/bin/launch-status.mjs",
+    "launch:clear": "node src/bin/launch-attest.mjs clear",
+    "launch:status": "node src/bin/launch-status.mjs",
+    "smoke:desktop-rehydration": "node src/bin/desktop-rehydration-smoke.mjs",
+    "smoke:mobile-proof": "node src/bin/mobile-proof.mjs",
+    "smoke:transport": "node src/bin/mobile-transport-smoke.mjs",
+    "smoke:native-bridge": "cd native/apple && swift run DextunnelNativeBridgeSmoke",
+    "test:native": "cd native/apple && swift test",
+    "test": "node --test",
+    "probe:app-server": "node src/bin/probe-codex-app-server.mjs",
+    "probe:app-server-write": "node src/bin/probe-codex-app-server-write.mjs"
+  }
+}

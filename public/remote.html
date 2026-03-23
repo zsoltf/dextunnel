@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dextunnel Remote</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="app-shell remote-shell">
+    <main class="terminal-shell remote-shell-main">
+      <section class="terminal-window remote-window" id="remote-window">
+        <aside id="remote-sidebar" class="remote-sidebar" aria-label="Projects and threads">
+          <div class="remote-sidebar-head">
+            <p class="remote-sidebar-kicker">Projects</p>
+            <p class="remote-sidebar-note">Threads by project</p>
+          </div>
+          <div id="remote-sidebar-groups" class="remote-sidebar-groups"></div>
+        </aside>
+        <button
+          type="button"
+          id="remote-sidebar-overlay"
+          class="remote-sidebar-overlay panel-hidden"
+          hidden
+          aria-label="Close thread menu"
+        ></button>
+
+        <section class="remote-main">
+          <section class="terminal-hero remote-hero">
+            <div class="remote-hero-row">
+              <div class="remote-hero-primary">
+                <button
+                  type="button"
+                  id="sidebar-toggle-button"
+                  class="command-button command-button-compact command-button-subtle sidebar-toggle-button"
+                  aria-expanded="true"
+                  aria-label="Collapse thread menu"
+                >
+                  <span class="hamburger-icon" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                </button>
+                <div class="remote-hero-copy">
+                  <div class="terminal-statusline">
+                    <span id="remote-marquee" class="terminal-marquee">Initializing session bridge...</span>
+                  </div>
+                  <h1 id="remote-title">Connecting...</h1>
+                </div>
+              </div>
+              <div class="button-row toolbar-strip remote-top-actions" aria-label="Remote controls">
+                <button type="button" id="reply-toggle-button" class="command-button button-primary">Reply</button>
+                <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take control</button>
+                <button type="button" id="refresh-button" class="command-button command-button-compact">Refresh</button>
+              </div>
+            </div>
+            <p id="remote-target" class="terminal-subline">Waiting for a live Codex session.</p>
+            <p id="remote-scope-note" class="sync-note">Shared room: select a live Codex thread. Drafts and queue stay only on this remote.</p>
+          </section>
+
+          <section class="terminal-panel remote-status-panel panel-hidden" id="remote-status-panel" hidden>
+            <div id="remote-operator-diagnostics" class="operator-diagnostics panel-hidden" hidden aria-live="polite"></div>
+            <p id="remote-ui-status" class="ui-status panel-hidden" aria-live="polite" hidden></p>
+          </section>
+
+          <section class="terminal-panel panel-emphasis panel-hidden" id="remote-action-panel" hidden>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Pending</p>
+                <h2 id="remote-action-title">Action required</h2>
+              </div>
+              <span id="remote-action-kind" class="inline-status">Approval</span>
+            </div>
+            <div id="remote-action-card" class="terminal-block">No pending action.</div>
+            <div id="remote-action-control-gate" class="terminal-block panel-hidden" hidden>
+              <p class="composer-warning-copy">Take control to respond from remote.</p>
+              <div class="button-row">
+                <button type="button" id="remote-action-control-button" class="command-button button-primary">Take control</button>
+              </div>
+            </div>
+            <form id="remote-action-form" class="stacked-form panel-hidden" hidden>
+              <div id="remote-action-questions" class="question-list"></div>
+              <div class="button-row">
+                <button type="submit" id="remote-action-submit" class="command-button button-primary">Submit</button>
+                <button type="button" id="remote-action-cancel" class="command-button">Cancel</button>
+              </div>
+            </form>
+            <div id="remote-action-buttons" class="button-row">
+              <button type="button" id="approve-button" class="command-button button-primary">Approve</button>
+              <button type="button" id="approve-session-button" class="command-button panel-hidden" hidden>Approve for session</button>
+              <button type="button" id="decline-button" class="command-button button-danger">Decline</button>
+            </div>
+          </section>
+
+          <section class="terminal-panel panel-emphasis composer-shell panel-hidden" id="composer-shell" hidden>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Reply</p>
+                <h2>Reply</h2>
+              </div>
+              <span id="composer-target" class="inline-status">No live target</span>
+            </div>
+            <p id="composer-scope-note" class="sync-note">Shared room: select a live Codex thread. Drafts and queue stay only on this remote.</p>
+            <form id="composer-form" class="stacked-form panel-hidden" hidden>
+              <textarea id="reply-text" rows="3" placeholder="Append to the selected live Codex thread"></textarea>
+              <div class="attachment-row">
+                <button type="button" id="dictation-button" class="command-button attachment-picker dictation-button">
+                  <span class="dictation-button-copy">
+                    <span id="dictation-button-label" class="dictation-button-label">Hold to talk</span>
+                    <span id="dictation-button-meta" class="dictation-button-meta">Voice memo</span>
+                  </span>
+                </button>
+                <div id="dictation-indicator" class="dictation-indicator panel-hidden" hidden aria-live="polite">
+                  <div class="dictation-wave" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <span id="dictation-indicator-text" class="dictation-indicator-text">Hold to talk</span>
+                </div>
+                <label class="command-button attachment-picker" for="reply-image-input">Add image</label>
+                <input id="reply-image-input" class="attachment-input" type="file" accept="image/*" multiple>
+                <div id="attachment-list" class="attachment-list panel-hidden" hidden></div>
+              </div>
+              <section id="composer-queue-shell" class="queue-shell panel-hidden" hidden>
+                <div class="queue-shell-head">
+                  <p class="queue-shell-label">Queue</p>
+                  <button type="button" id="clear-queue-button" class="command-button command-button-subtle command-button-compact">Clear</button>
+                </div>
+                <div id="composer-queue-list" class="queue-list"></div>
+              </section>
+              <div class="button-row composer-command-row">
+                <button type="button" id="composer-control-button" class="command-button panel-hidden" hidden>Take control</button>
+                <button type="submit" id="send-reply-button" class="command-button button-primary">Steer now</button>
+                <button type="button" id="queue-reply-button" class="command-button">Queue</button>
+                <button type="button" id="composer-close-button" class="command-button">Close</button>
+              </div>
+            </form>
+            <p id="composer-status" class="composer-status">Ready</p>
+            <p id="composer-sync-note" class="sync-note">Desktop Codex can lag behind remote writes. Reveal in Codex navigates only.</p>
+          </section>
+
+          <section class="terminal-panel remote-feed-panel">
+            <div class="section-head feed-head">
+              <div class="feed-tools">
+                <div class="filter-group" aria-label="Feed filters">
+                  <button type="button" class="filter-button is-active" data-filter="updates">Updates</button>
+                  <button type="button" class="filter-button is-active" data-filter="thread">Thread</button>
+                  <button type="button" class="filter-button is-active" data-filter="tools">Tools</button>
+                  <button type="button" class="filter-button is-active" data-filter="changes">Changes</button>
+                </div>
+                <button type="button" id="expand-all-button" class="command-button command-button-subtle command-button-compact">Expand all</button>
+              </div>
+            </div>
+            <div class="feed-list" id="remote-feed"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/remote.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+.DS_Store
+.agent/
+AGENTS.md
+GEMINI.md
+.npm-cache/
+.playwright-browsers/
+.playwright-home/
+native/apple/.build/
+native/apple/.build-resources/*
+!native/apple/.build-resources/.gitkeep
+native/apple/.build-resources/EmbeddedBridge/*
+!native/apple/.build-resources/EmbeddedBridge/.gitkeep
+native/apple/dist/

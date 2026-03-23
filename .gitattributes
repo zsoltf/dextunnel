@@ -1,0 +1,10 @@
+.DS_Store export-ignore
+.agent export-ignore
+AGENTS.md export-ignore
+GEMINI.md export-ignore
+.npm-cache export-ignore
+.playwright-browsers export-ignore
+.playwright-home export-ignore
+native/apple/.build export-ignore
+native/apple/.build-resources export-ignore
+native/apple/dist export-ignore

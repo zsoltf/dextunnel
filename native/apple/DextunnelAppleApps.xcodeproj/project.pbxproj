@@ -1,0 +1,538 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1190BE58B85F3CB3FE2AC508 /* UniversalIOSOperatorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B1B7E0C7491BF2B59445E3 /* UniversalIOSOperatorApp.swift */; };
+		2AD4C8B4A25B999B18559999 /* DextunnelMenuBarHostShell in Frameworks */ = {isa = PBXBuildFile; productRef = 4922A2996783A15C14CF207D /* DextunnelMenuBarHostShell */; };
+		4976D0D95B18594D42D00058 /* BridgeSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */; };
+		5B26A3CE61725CF679C9CAAE /* DextunnelNativeAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 83058D9C84DD3A7AD165137E /* DextunnelNativeAppSupport */; };
+		612536ED0D48188A303424F4 /* BridgeSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */; };
+		673691926E0002B6E59CD904 /* DextunnelNativeAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F2D6429BB7DA61ABCD37D390 /* DextunnelNativeAppSupport */; };
+		7735733D3600F595B075BE8C /* DextunnelAppleState in Frameworks */ = {isa = PBXBuildFile; productRef = 3599E3F8687E4F32BE8044B8 /* DextunnelAppleState */; };
+		B5AE344C4C0B4F5800764B3A /* MenuBarHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */; };
+		D428198659AF025D91E5F7F3 /* DextunnelUniversalIOSShell in Frameworks */ = {isa = PBXBuildFile; productRef = 925B1FEC7A54A28559D35813 /* DextunnelUniversalIOSShell */; };
+		E418E0FB08345F9E3E4176E9 /* EmbeddedBridge in Resources */ = {isa = PBXBuildFile; fileRef = F20FF749BCBF8287D0EC179D /* EmbeddedBridge */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		275A9342EBBBC8D4E7E1AB97 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30B1B7E0C7491BF2B59445E3 /* UniversalIOSOperatorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalIOSOperatorApp.swift; sourceTree = "<group>"; };
+		3ED85F398E5906DACF6C99E1 /* DextunnelUniversalIOSOperatorApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DextunnelUniversalIOSOperatorApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarHostApp.swift; sourceTree = "<group>"; };
+		CC5A4D49EB9B9E1636268024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeSetupView.swift; sourceTree = "<group>"; };
+		DFA64D54A267C5A4C217A89C /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
+		DFDDB7E6F1FD0BC2D1BC3306 /* EmbeddedNode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EmbeddedNode.entitlements; sourceTree = "<group>"; };
+		E66DF7AD509E205BD131EBF2 /* DextunnelMenuBarHostApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DextunnelMenuBarHostApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F20FF749BCBF8287D0EC179D /* EmbeddedBridge */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EmbeddedBridge; path = ".build-resources/EmbeddedBridge"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4714C5FC749D762A992970E0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2AD4C8B4A25B999B18559999 /* DextunnelMenuBarHostShell in Frameworks */,
+				5B26A3CE61725CF679C9CAAE /* DextunnelNativeAppSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B03BE25FEFDEC51EBA0DF8BC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				673691926E0002B6E59CD904 /* DextunnelNativeAppSupport in Frameworks */,
+				D428198659AF025D91E5F7F3 /* DextunnelUniversalIOSShell in Frameworks */,
+				7735733D3600F595B075BE8C /* DextunnelAppleState in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		490B9155386E3D9282836821 = {
+			isa = PBXGroup;
+			children = (
+				E5125C77E4BBECC38C01DA44 /* .build-resources */,
+				C71E02522F929758BD4D686F /* Apps */,
+				C324C7398F7B4B0BDB142EED /* Packages */,
+				85C00F297DCACCD9BD8855F9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		85C00F297DCACCD9BD8855F9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E66DF7AD509E205BD131EBF2 /* DextunnelMenuBarHostApp.app */,
+				3ED85F398E5906DACF6C99E1 /* DextunnelUniversalIOSOperatorApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C324C7398F7B4B0BDB142EED /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				DFA64D54A267C5A4C217A89C /* apple */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		C71E02522F929758BD4D686F /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				E22590534DB193865DA7DC4C /* MenuBarHostApp */,
+				ECD7104EC3C7E0DB83856757 /* Shared */,
+				CE5DDB703E71D433155329AE /* UniversalIOSOperatorApp */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
+		CE5DDB703E71D433155329AE /* UniversalIOSOperatorApp */ = {
+			isa = PBXGroup;
+			children = (
+				275A9342EBBBC8D4E7E1AB97 /* Info.plist */,
+				30B1B7E0C7491BF2B59445E3 /* UniversalIOSOperatorApp.swift */,
+			);
+			path = UniversalIOSOperatorApp;
+			sourceTree = "<group>";
+		};
+		E22590534DB193865DA7DC4C /* MenuBarHostApp */ = {
+			isa = PBXGroup;
+			children = (
+				DFDDB7E6F1FD0BC2D1BC3306 /* EmbeddedNode.entitlements */,
+				CC5A4D49EB9B9E1636268024 /* Info.plist */,
+				937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */,
+			);
+			path = MenuBarHostApp;
+			sourceTree = "<group>";
+		};
+		E5125C77E4BBECC38C01DA44 /* .build-resources */ = {
+			isa = PBXGroup;
+			children = (
+				F20FF749BCBF8287D0EC179D /* EmbeddedBridge */,
+			);
+			path = ".build-resources";
+			sourceTree = "<group>";
+		};
+		ECD7104EC3C7E0DB83856757 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		22B6F680DAFA1EC92E454ED6 /* DextunnelUniversalIOSOperatorApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 35584B7766F268E14E86C9D8 /* Build configuration list for PBXNativeTarget "DextunnelUniversalIOSOperatorApp" */;
+			buildPhases = (
+				3C430036EE841FC2E7B28775 /* Sources */,
+				B03BE25FEFDEC51EBA0DF8BC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DextunnelUniversalIOSOperatorApp;
+			packageProductDependencies = (
+				F2D6429BB7DA61ABCD37D390 /* DextunnelNativeAppSupport */,
+				925B1FEC7A54A28559D35813 /* DextunnelUniversalIOSShell */,
+				3599E3F8687E4F32BE8044B8 /* DextunnelAppleState */,
+			);
+			productName = DextunnelUniversalIOSOperatorApp;
+			productReference = 3ED85F398E5906DACF6C99E1 /* DextunnelUniversalIOSOperatorApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4D373036532EE2431D10540D /* DextunnelMenuBarHostApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3068299BD1A26E8A4408E248 /* Build configuration list for PBXNativeTarget "DextunnelMenuBarHostApp" */;
+			buildPhases = (
+				E6288EB7D1544F1FE5F46ECC /* Prepare Embedded Bridge Runtime */,
+				457103DC662BDA5C66C8D754 /* Sources */,
+				4A6E50A964E613C5B2A9C0FA /* Resources */,
+				4714C5FC749D762A992970E0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DextunnelMenuBarHostApp;
+			packageProductDependencies = (
+				4922A2996783A15C14CF207D /* DextunnelMenuBarHostShell */,
+				83058D9C84DD3A7AD165137E /* DextunnelNativeAppSupport */,
+			);
+			productName = DextunnelMenuBarHostApp;
+			productReference = E66DF7AD509E205BD131EBF2 /* DextunnelMenuBarHostApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A4F68A6E700656A088B50040 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4D373036532EE2431D10540D = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1FF33AC7B4768D6760DE597E /* Build configuration list for PBXProject "DextunnelAppleApps" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 490B9155386E3D9282836821;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EAE1A5BB76119F254620A873 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4D373036532EE2431D10540D /* DextunnelMenuBarHostApp */,
+				22B6F680DAFA1EC92E454ED6 /* DextunnelUniversalIOSOperatorApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4A6E50A964E613C5B2A9C0FA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E418E0FB08345F9E3E4176E9 /* EmbeddedBridge in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E6288EB7D1544F1FE5F46ECC /* Prepare Embedded Bridge Runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Prepare Embedded Bridge Runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$PROJECT_DIR/scripts/prepare-embedded-bridge.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3C430036EE841FC2E7B28775 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				612536ED0D48188A303424F4 /* BridgeSetupView.swift in Sources */,
+				1190BE58B85F3CB3FE2AC508 /* UniversalIOSOperatorApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		457103DC662BDA5C66C8D754 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4976D0D95B18594D42D00058 /* BridgeSetupView.swift in Sources */,
+				B5AE344C4C0B4F5800764B3A /* MenuBarHostApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		280FE356F5C7CCFDE8F2B5ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/UniversalIOSOperatorApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.iosoperator;
+				PRODUCT_NAME = DextunnelUniversalIOSOperatorApp;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3D8DD90D358BE78190AB8036 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		6345082EC5099AF8A021AD56 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/MenuBarHostApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.menubarhost;
+				PRODUCT_NAME = DextunnelMenuBarHostApp;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		C09A4B36665448D36D2EA2A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/MenuBarHostApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.menubarhost;
+				PRODUCT_NAME = DextunnelMenuBarHostApp;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+		D337450F7C31C5FD801AFC5A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/UniversalIOSOperatorApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.iosoperator;
+				PRODUCT_NAME = DextunnelUniversalIOSOperatorApp;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FD2F2BDB87BACDC85FE26ECC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1FF33AC7B4768D6760DE597E /* Build configuration list for PBXProject "DextunnelAppleApps" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FD2F2BDB87BACDC85FE26ECC /* Debug */,
+				3D8DD90D358BE78190AB8036 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3068299BD1A26E8A4408E248 /* Build configuration list for PBXNativeTarget "DextunnelMenuBarHostApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6345082EC5099AF8A021AD56 /* Debug */,
+				C09A4B36665448D36D2EA2A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		35584B7766F268E14E86C9D8 /* Build configuration list for PBXNativeTarget "DextunnelUniversalIOSOperatorApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				280FE356F5C7CCFDE8F2B5ED /* Debug */,
+				D337450F7C31C5FD801AFC5A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		EAE1A5BB76119F254620A873 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3599E3F8687E4F32BE8044B8 /* DextunnelAppleState */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DextunnelAppleState;
+		};
+		4922A2996783A15C14CF207D /* DextunnelMenuBarHostShell */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DextunnelMenuBarHostShell;
+		};
+		83058D9C84DD3A7AD165137E /* DextunnelNativeAppSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DextunnelNativeAppSupport;
+		};
+		925B1FEC7A54A28559D35813 /* DextunnelUniversalIOSShell */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DextunnelUniversalIOSShell;
+		};
+		F2D6429BB7DA61ABCD37D390 /* DextunnelNativeAppSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DextunnelNativeAppSupport;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A4F68A6E700656A088B50040 /* Project object */;
+}

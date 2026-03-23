@@ -1,0 +1,64 @@
+name: DextunnelAppleApps
+options:
+  minimumXcodeGenVersion: 2.38.0
+  createIntermediateGroups: true
+packages:
+  DextunnelAppleSeed:
+    path: .
+targets:
+  DextunnelMenuBarHostApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Apps/Shared
+      - path: Apps/MenuBarHostApp
+      - path: .build-resources/EmbeddedBridge
+        buildPhase: resources
+        type: folder
+    dependencies:
+      - package: DextunnelAppleSeed
+        product: DextunnelMenuBarHostShell
+      - package: DextunnelAppleSeed
+        product: DextunnelNativeAppSupport
+    preBuildScripts:
+      - name: Prepare Embedded Bridge Runtime
+        script: |
+          "$PROJECT_DIR/scripts/prepare-embedded-bridge.sh"
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dextunnel.menubarhost
+        PRODUCT_NAME: DextunnelMenuBarHostApp
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Apps/MenuBarHostApp/Info.plist
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_EMIT_LOC_STRINGS: NO
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+
+  DextunnelUniversalIOSOperatorApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Apps/Shared
+      - path: Apps/UniversalIOSOperatorApp
+    dependencies:
+      - package: DextunnelAppleSeed
+        product: DextunnelNativeAppSupport
+      - package: DextunnelAppleSeed
+        product: DextunnelUniversalIOSShell
+      - package: DextunnelAppleSeed
+        product: DextunnelAppleState
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dextunnel.iosoperator
+        PRODUCT_NAME: DextunnelUniversalIOSOperatorApp
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Apps/UniversalIOSOperatorApp/Info.plist
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_EMIT_LOC_STRINGS: NO
+        CODE_SIGNING_ALLOWED: NO
