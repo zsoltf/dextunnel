@@ -23,8 +23,3 @@ The public repo keeps a small docs surface on purpose. Some maintainers keep add
   - Advanced local bridge HTTP and SSE contract for automation and native clients
 - `docs/ops/desktop-sync.md`
   - Honest contract for desktop visibility after remote writes
-
-## Native App Docs
-
-- `native/apple/README.md`
-  - Native Apple surface overview, build commands, and rollout notes

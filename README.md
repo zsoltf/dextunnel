@@ -8,6 +8,12 @@ Recommended on Mac: `DextunnelHost` + Tailscale.
 If you want the advanced manual path, use `npm start`.
 Native iPhone and iPad app coming soon.
 
+## Screenshots
+
+| Reply | Approvals | Updates |
+| --- | --- | --- |
+| ![Dextunnel reply view](docs/dextunnel-reply.png) | ![Dextunnel approval view](docs/dextunnel-approval.png) | ![Dextunnel updates view](docs/dextunnel-updates.png) |
+
 ## Mac
 
 This is the main path.
@@ -86,7 +92,6 @@ npm run release:check
 
 - Mac host release: [docs/ops/apple-menubar-release.md](docs/ops/apple-menubar-release.md)
 - npm publish: [docs/ops/npm-publish.md](docs/ops/npm-publish.md)
-- Native Apple seed: [native/apple/README.md](native/apple/README.md)
 - Docs map: [docs/index.md](docs/index.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
