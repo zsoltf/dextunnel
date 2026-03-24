@@ -5,7 +5,7 @@ It's like VibeTunnel, but for the Codex app.
 Dextunnel lets you keep a real Codex session moving from your phone. Read the thread, reply, queue messages, and clear approvals without doing SSH or remote desktop on a tiny screen.
 
 Recommended on Mac: `DextunnelHost` + Tailscale.
-If you want the advanced manual path, use `npm start`.
+If you want the advanced manual path, run from source or install the CLI package.
 Native iPhone and iPad app coming soon.
 
 ## Screenshots
@@ -46,9 +46,19 @@ Setup links:
 
 If you want full manual control:
 
+Run from this repo:
+
 ```bash
 npm start
 npm run doctor
+```
+
+Or install the packaged CLI:
+
+```bash
+npm install -g dextunnel
+dextunnel serve
+dextunnel doctor
 ```
 
 Then open [http://127.0.0.1:4317/](http://127.0.0.1:4317/).
