@@ -14,6 +14,7 @@
 		612536ED0D48188A303424F4 /* BridgeSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */; };
 		673691926E0002B6E59CD904 /* DextunnelNativeAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = F2D6429BB7DA61ABCD37D390 /* DextunnelNativeAppSupport */; };
 		7735733D3600F595B075BE8C /* DextunnelAppleState in Frameworks */ = {isa = PBXBuildFile; productRef = 3599E3F8687E4F32BE8044B8 /* DextunnelAppleState */; };
+		B0FAB40ED3416758813A3FB2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 469F83810FD6CD9C926AFCD6 /* Assets.xcassets */; };
 		B5AE344C4C0B4F5800764B3A /* MenuBarHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */; };
 		D428198659AF025D91E5F7F3 /* DextunnelUniversalIOSShell in Frameworks */ = {isa = PBXBuildFile; productRef = 925B1FEC7A54A28559D35813 /* DextunnelUniversalIOSShell */; };
 		E418E0FB08345F9E3E4176E9 /* EmbeddedBridge in Resources */ = {isa = PBXBuildFile; fileRef = F20FF749BCBF8287D0EC179D /* EmbeddedBridge */; };
@@ -23,6 +24,7 @@
 		275A9342EBBBC8D4E7E1AB97 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30B1B7E0C7491BF2B59445E3 /* UniversalIOSOperatorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalIOSOperatorApp.swift; sourceTree = "<group>"; };
 		3ED85F398E5906DACF6C99E1 /* DextunnelUniversalIOSOperatorApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DextunnelUniversalIOSOperatorApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		469F83810FD6CD9C926AFCD6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarHostApp.swift; sourceTree = "<group>"; };
 		CC5A4D49EB9B9E1636268024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D064B1CFD2B7A67596552C60 /* BridgeSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeSetupView.swift; sourceTree = "<group>"; };
@@ -104,6 +106,7 @@
 		E22590534DB193865DA7DC4C /* MenuBarHostApp */ = {
 			isa = PBXGroup;
 			children = (
+				469F83810FD6CD9C926AFCD6 /* Assets.xcassets */,
 				DFDDB7E6F1FD0BC2D1BC3306 /* EmbeddedNode.entitlements */,
 				CC5A4D49EB9B9E1636268024 /* Info.plist */,
 				937D96671E754B466BDCD7D4 /* MenuBarHostApp.swift */,
@@ -215,6 +218,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0FAB40ED3416758813A3FB2 /* Assets.xcassets in Resources */,
 				E418E0FB08345F9E3E4176E9 /* EmbeddedBridge in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -42,6 +42,17 @@ require_setting() {
   fi
 }
 
+package_zip() {
+  require_command ditto
+  require_command shasum
+  rm -f "${ZIP_PATH}" "${CHECKSUM_PATH}"
+  ditto -c -k --keepParent --norsrc "${APP_PATH}" "${ZIP_PATH}"
+  (
+    cd "${DIST_ROOT}"
+    shasum -a 256 "${ZIP_NAME}" > "$(basename "${CHECKSUM_PATH}")"
+  )
+}
+
 prepare() {
   require_command xcodegen
   mkdir -p "${DIST_ROOT}"
@@ -100,6 +111,7 @@ sign_exported_app() {
   local target=""
 
   require_command codesign
+  require_command xattr
 
   if [[ ! -x "${embedded_node}" ]]; then
     echo "release-menubar-host: expected embedded Node runtime at ${embedded_node}" >&2
@@ -109,6 +121,10 @@ sign_exported_app() {
     echo "release-menubar-host: missing embedded node entitlements at ${EMBEDDED_NODE_ENTITLEMENTS}" >&2
     exit 1
   fi
+
+  # Keep the shipped bundle free of local provenance/resource metadata before
+  # we apply the final signatures and build the release archive.
+  xattr -cr "${APP_PATH}"
 
   if [[ -d "${embedded_lib_root}" ]]; then
     while IFS= read -r target; do
@@ -142,17 +158,10 @@ export_archive() {
 }
 
 zip_exported_app() {
-  require_command ditto
-  require_command shasum
   if [[ ! -d "${APP_PATH}" ]]; then
     export_archive
   fi
-  rm -f "${ZIP_PATH}"
-  ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
-  (
-    cd "${DIST_ROOT}"
-    shasum -a 256 "${ZIP_NAME}" > "$(basename "${CHECKSUM_PATH}")"
-  )
+  package_zip
 }
 
 notarize_export() {
@@ -165,8 +174,7 @@ notarize_export() {
   xcrun stapler staple "${APP_PATH}"
   xcrun stapler validate "${APP_PATH}"
   spctl --assess --type execute -v "${APP_PATH}"
-  rm -f "${ZIP_PATH}"
-  ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
+  package_zip
 }
 
 case "${MODE}" in
