@@ -20,6 +20,8 @@ This is the main path.
 That's it.
 
 `DextunnelHost` keeps the bridge on `127.0.0.1` and handles `tailscale serve` for you.
+macOS may ask for local network access on first launch because the app checks and configures Tailscale for you.
+The Dextunnel bridge itself still stays on `127.0.0.1`.
 
 Why Tailscale:
 

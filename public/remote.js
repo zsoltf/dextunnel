@@ -100,6 +100,9 @@ const FEED_STICKY_TOP_THRESHOLD_PX = 96;
 const SIDEBAR_MOBILE_BREAKPOINT_PX = 1180;
 const DRAFT_STORAGE_PREFIX = "dextunnel:draft:";
 const QUEUE_STORAGE_PREFIX = "dextunnel:queue:";
+const IOS_FOCUS_PLATFORM_REGEX = /iPad|iPhone|iPod/;
+const IOS_VIEWPORT_MAX_SCALE_CONTENT =
+  "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
 const surfaceBootstrap = getSurfaceBootstrap("remote");
 const surfaceAuthClientId = surfaceBootstrap.clientId;
 
@@ -246,6 +249,57 @@ const nodes = {
   queueReplyButton: document.querySelector("#queue-reply-button"),
   sendReplyButton: document.querySelector("#send-reply-button")
 };
+
+function isIosTouchDevice() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  if (IOS_FOCUS_PLATFORM_REGEX.test(navigator.userAgent || "")) {
+    return true;
+  }
+
+  return navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1;
+}
+
+function configureIosViewport() {
+  if (!isIosTouchDevice()) {
+    return;
+  }
+
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  if (!viewportMeta) {
+    return;
+  }
+
+  viewportMeta.setAttribute("content", IOS_VIEWPORT_MAX_SCALE_CONTENT);
+}
+
+function focusReplyTextAtEnd() {
+  if (!nodes.replyText) {
+    return;
+  }
+
+  const applyFocus = () => {
+    try {
+      nodes.replyText.focus({ preventScroll: true });
+    } catch {
+      nodes.replyText.focus();
+    }
+    const end = nodes.replyText.value.length;
+    if (typeof nodes.replyText.setSelectionRange === "function") {
+      nodes.replyText.setSelectionRange(end, end);
+    }
+  };
+
+  if (isIosTouchDevice()) {
+    return;
+  }
+
+  window.setTimeout(applyFocus, 0);
+}
+
+configureIosViewport();
 
 const marqueeTicker = startTicker(nodes.marquee, [
   "initializing session bridge...",
@@ -1794,10 +1848,7 @@ function stageCompanionPrompt(entry) {
   setTransientUiNotice(`${wakeLabel} prompt staged.`, "success", 2200);
   render();
   scheduleComposerStatusReset(1800);
-  window.setTimeout(() => {
-    nodes.replyText.focus();
-    nodes.replyText.setSelectionRange(nodes.replyText.value.length, nodes.replyText.value.length);
-  }, 0);
+  focusReplyTextAtEnd();
 }
 
 function renderFilterButtons(entries) {
@@ -3079,7 +3130,7 @@ function queueLiveReply({ rawText, attachments }) {
     "success"
   );
   render();
-  window.setTimeout(() => nodes.replyText.focus(), 0);
+  focusReplyTextAtEnd();
   scheduleQueueFlush();
 }
 
@@ -3167,7 +3218,7 @@ async function dispatchLiveReply({ rawText, attachments, threadId = currentThrea
     );
     render();
     if (composerWasOpen) {
-      window.setTimeout(() => nodes.replyText.focus(), 0);
+      focusReplyTextAtEnd();
     }
     scheduleQueueFlush(650);
     window.setTimeout(() => {
@@ -3436,7 +3487,7 @@ nodes.replyToggleButton.addEventListener("click", () => {
   render();
 
   if (isComposerOpen) {
-    window.setTimeout(() => nodes.replyText.focus(), 0);
+    focusReplyTextAtEnd();
   }
 });
 
