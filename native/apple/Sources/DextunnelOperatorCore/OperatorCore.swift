@@ -465,7 +465,7 @@ public enum DextunnelOperatorCore {
 
     private static func threadBusy(_ context: DextunnelOperatorContext) -> Bool {
         let normalizedStatus = (context.threadStatus ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let statusBusy = !normalizedStatus.isEmpty && !["idle", "completed", "complete"].contains(normalizedStatus)
+        let statusBusy = ["inprogress", "running"].contains(normalizedStatus)
         return context.isSendingReply || !(context.writeLockStatus ?? "").isEmpty || !(context.activeTurnId ?? "").isEmpty || statusBusy
     }
 

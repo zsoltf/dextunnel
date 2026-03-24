@@ -59,6 +59,8 @@ test("queue summary and busy helpers stay literal", () => {
   assert.equal(threadBusy({ writeLockStatus: "running" }), true);
   assert.equal(threadBusy({ threadStatus: { type: "inProgress" } }), true);
   assert.equal(threadBusy({ threadStatus: "idle" }), false);
+  assert.equal(threadBusy({ threadStatus: { type: "notLoaded" } }), false);
+  assert.equal(threadBusy({ threadStatus: "live" }), false);
 });
 
 test("queue availability allows storing intent whenever the session is writable", () => {

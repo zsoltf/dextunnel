@@ -46,7 +46,7 @@ func operatorAvailabilityBlocksOnPendingInteraction() {
 }
 
 @Test
-func operatorAvailabilityTreatsNonIdleThreadStatusAsBusy() {
+func operatorAvailabilityTreatsInProgressThreadStatusAsBusy() {
     let availability = DextunnelOperatorCore.availability(for: DextunnelOperatorContext(
         hasDraftText: true,
         hasRemoteControl: true,
@@ -58,6 +58,21 @@ func operatorAvailabilityTreatsNonIdleThreadStatusAsBusy() {
     #expect(availability.canQueue)
     #expect(!availability.canSteer)
     #expect(availability.statusMessage == "Codex is busy. Queue your next steer.")
+}
+
+@Test
+func operatorAvailabilityDoesNotTreatNotLoadedThreadStatusAsBusy() {
+    let availability = DextunnelOperatorCore.availability(for: DextunnelOperatorContext(
+        hasDraftText: true,
+        hasRemoteControl: true,
+        threadId: "thread-1",
+        threadStatus: "notLoaded",
+        watcherConnected: true
+    ))
+
+    #expect(availability.canQueue)
+    #expect(availability.canSteer)
+    #expect(availability.statusMessage == "Ready")
 }
 
 @Test

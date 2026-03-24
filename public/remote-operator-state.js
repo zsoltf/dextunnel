@@ -136,7 +136,7 @@ export function threadBusy({
           typeof threadStatus === "object" &&
           String(threadStatus.type || threadStatus.status || "").trim().toLowerCase()
         ) || "";
-  const statusBusy = Boolean(normalizedStatus && !["idle", "completed", "complete"].includes(normalizedStatus));
+  const statusBusy = ["inprogress", "running"].includes(normalizedStatus);
   return Boolean(isSendingReply || writeLockStatus || activeTurnId || statusBusy);
 }
 

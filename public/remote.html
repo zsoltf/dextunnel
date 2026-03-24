@@ -55,7 +55,7 @@
 	              </div>
 	              <div class="button-row toolbar-strip remote-top-actions" aria-label="Remote controls">
 	                <button type="button" id="reply-toggle-button" class="command-button button-primary">Reply</button>
-	                <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take control</button>
+          <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take Control</button>
 	                <button type="button" id="refresh-button" class="command-button command-button-compact">Refresh</button>
 	              </div>
 	            </div>
@@ -79,7 +79,7 @@
             <div id="remote-action-control-gate" class="terminal-block panel-hidden" hidden>
               <p class="composer-warning-copy">Take control to respond from remote.</p>
               <div class="button-row">
-                <button type="button" id="remote-action-control-button" class="command-button button-primary">Take control</button>
+                <button type="button" id="remote-action-control-button" class="command-button button-primary">Take Control</button>
               </div>
             </div>
             <form id="remote-action-form" class="stacked-form panel-hidden" hidden>
@@ -108,12 +108,6 @@
             <form id="composer-form" class="stacked-form panel-hidden" hidden>
               <textarea id="reply-text" rows="3" placeholder="Append to the selected live Codex thread"></textarea>
               <div class="attachment-row">
-                <button type="button" id="dictation-button" class="command-button attachment-picker dictation-button">
-                  <span class="dictation-button-copy">
-                    <span id="dictation-button-label" class="dictation-button-label">Hold to talk</span>
-                    <span id="dictation-button-meta" class="dictation-button-meta">Voice memo</span>
-                  </span>
-                </button>
                 <div id="dictation-indicator" class="dictation-indicator panel-hidden" hidden aria-live="polite">
                   <div class="dictation-wave" aria-hidden="true">
                     <span></span>
@@ -124,8 +118,6 @@
                   </div>
                   <span id="dictation-indicator-text" class="dictation-indicator-text">Hold to talk</span>
                 </div>
-                <label class="command-button attachment-picker" for="reply-image-input">Add image</label>
-                <input id="reply-image-input" class="attachment-input" type="file" accept="image/*" multiple>
                 <div id="attachment-list" class="attachment-list panel-hidden" hidden></div>
               </div>
               <section id="composer-queue-shell" class="queue-shell panel-hidden" hidden>
@@ -136,9 +128,16 @@
                 <div id="composer-queue-list" class="queue-list"></div>
               </section>
               <div class="button-row composer-command-row">
-                <button type="button" id="composer-control-button" class="command-button panel-hidden" hidden>Take control</button>
-                <button type="submit" id="send-reply-button" class="command-button button-primary">Steer now</button>
+                <button type="button" id="composer-control-button" class="command-button panel-hidden" hidden>Take Control</button>
+                <button type="submit" id="send-reply-button" class="command-button button-primary">Steer Now</button>
                 <button type="button" id="queue-reply-button" class="command-button">Queue</button>
+                <button type="button" id="dictation-button" class="command-button attachment-picker dictation-button">
+                  <span class="dictation-button-copy">
+                    <span id="dictation-button-label" class="dictation-button-label">Dictate</span>
+                  </span>
+                </button>
+                <label class="command-button attachment-picker" for="reply-image-input">Add Image</label>
+                <input id="reply-image-input" class="attachment-input" type="file" accept="image/*" multiple>
                 <button type="button" id="composer-close-button" class="command-button">Close</button>
               </div>
             </form>

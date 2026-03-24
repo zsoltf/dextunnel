@@ -2055,6 +2055,11 @@ textarea {
   gap: 12px;
 }
 
+.composer-command-row .attachment-picker,
+.composer-command-row .dictation-button {
+  flex: 0 0 auto;
+}
+
 .attachment-input {
   display: none;
 }
@@ -2662,7 +2667,6 @@ textarea {
     line-height: 1.35;
   }
 
-  .remote-shell .attachment-row,
   .remote-shell .composer-command-row {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2670,9 +2674,12 @@ textarea {
     scrollbar-width: none;
   }
 
-  .remote-shell .attachment-row::-webkit-scrollbar,
   .remote-shell .composer-command-row::-webkit-scrollbar {
     display: none;
+  }
+
+  .remote-shell .attachment-row {
+    gap: 6px;
   }
 
   .remote-shell .dictation-button,

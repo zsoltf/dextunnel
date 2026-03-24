@@ -338,9 +338,9 @@ function dictationUiModel() {
 
   return {
     indicatorText: "Hold to talk",
-    label: "Hold to talk",
+    label: "Dictate",
     live: false,
-    meta: "Voice memo"
+    meta: "Hold to talk"
   };
 }
 
@@ -2213,7 +2213,7 @@ function renderStatuses() {
         : "Taking..."
       : controlActive
         ? "Release control"
-        : "Take control";
+        : "Take Control";
     nodes.controlToggleButton.classList.toggle("button-primary", !controlActive);
     nodes.controlToggleButton.classList.toggle("is-busy", uiState.controlling);
   }
@@ -2253,7 +2253,7 @@ function renderStatuses() {
   nodes.dictationIndicator.classList.toggle("is-live", dictationUi.live);
   setPanelHidden(nodes.composerControlButton, true);
   nodes.composerControlButton.disabled = true;
-  nodes.composerControlButton.textContent = "Take control";
+  nodes.composerControlButton.textContent = "Take Control";
   nodes.composerControlButton.classList.remove("is-busy");
   const canQueue = canQueueReplyState({
     controlActive,
@@ -2277,7 +2277,7 @@ function renderStatuses() {
     threadBusy: busy,
     threadId: liveThread?.id || ""
   });
-  nodes.sendReplyButton.textContent = isSendingReply ? "Steering..." : "Steer now";
+  nodes.sendReplyButton.textContent = isSendingReply ? "Steering..." : "Steer Now";
   nodes.sendReplyButton.classList.toggle("is-busy", isSendingReply);
   nodes.queueReplyButton.disabled = !canQueue || isDictating;
   nodes.queueReplyButton.textContent = queuedCount > 0 ? `Queue (${queuedCount})` : "Queue";
@@ -2432,7 +2432,7 @@ function renderActionPanel() {
   const isUserInput = pending.actionKind === "user_input";
   setPanelHidden(nodes.actionControlGate, remoteCanRespond);
   nodes.actionControlButton.disabled = uiState.controlling || uiState.selecting;
-  nodes.actionControlButton.textContent = uiState.controlling ? "Taking..." : "Take control";
+  nodes.actionControlButton.textContent = uiState.controlling ? "Taking..." : "Take Control";
   nodes.actionControlButton.classList.toggle("is-busy", uiState.controlling);
   setPanelHidden(nodes.actionForm, !isUserInput);
   setPanelHidden(nodes.actionButtons, isUserInput);
