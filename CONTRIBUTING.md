@@ -55,6 +55,7 @@ xcodegen generate
 Release/notarization notes live in:
 
 - `docs/ops/apple-menubar-release.md`
+- `docs/ops/npm-publish.md`
 
 ## Workflow notes
 

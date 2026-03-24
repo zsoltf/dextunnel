@@ -6,8 +6,6 @@ import path from "node:path";
 import { AGENT_ROOM_MEMBER_IDS } from "./agent-room-state.mjs";
 import { normalizeAgentRoomReply } from "./agent-room-text.mjs";
 
-const ORACLE_PROJECT_URL = "https://chatgpt.com/g/g-p-69b6e431d48081919229149923045c74/project?ref=mini";
-
 function scriptPath(...parts) {
   return path.join(process.env.HOME || "", ".agents", "skills", ...parts);
 }
@@ -23,6 +21,23 @@ function buildLanePrompt(participantId, promptText = "") {
     "Latest room prompt:",
     promptText
   ].join("\n");
+}
+
+function resolveOracleLaneConfig() {
+  const remoteChrome = String(
+    process.env.DEXTUNNEL_ORACLE_REMOTE_CHROME || process.env.ORACLE_REMOTE_CHROME || ""
+  ).trim();
+  const projectUrl = String(
+    process.env.DEXTUNNEL_ORACLE_PROJECT_URL || process.env.ORACLE_PROJECT_URL || ""
+  ).trim();
+
+  if (!remoteChrome || !projectUrl) {
+    throw new Error(
+      "Oracle lane requires DEXTUNNEL_ORACLE_REMOTE_CHROME/ORACLE_REMOTE_CHROME and DEXTUNNEL_ORACLE_PROJECT_URL/ORACLE_PROJECT_URL."
+    );
+  }
+
+  return { projectUrl, remoteChrome };
 }
 
 function spawnAndCollect(command, args, { cwd = process.cwd(), env = process.env, stdin = "" } = {}) {
@@ -231,15 +246,16 @@ export function createAgentRoomRuntime({
         return normalizeAgentRoomReply(participantId, stdout);
       }
       case "oracle": {
+        const { projectUrl, remoteChrome } = resolveOracleLaneConfig();
         const { stdout } = await runLoggedWrapper(
           scriptPath("oracle", "scripts", "oracle_logged.sh"),
           [
             "--engine",
             "browser",
             "--remote-chrome",
-            "oracle.local:9223",
+            remoteChrome,
             "--chatgpt-url",
-            ORACLE_PROJECT_URL,
+            projectUrl,
             "--browser-model-strategy",
             "current",
             "--file",

@@ -8,6 +8,7 @@ import {
   buildSessionLogSnapshot,
   getWritableTurnStrategy,
   mapThreadToCompanionSnapshot,
+  pageTranscriptEntries,
   readTranscriptHistoryPageFromSessionLog,
   readTranscriptFromSessionLog
 } from "../src/lib/codex-app-server-client.mjs";
@@ -231,6 +232,33 @@ test("readTranscriptHistoryPageFromSessionLog pages older transcript entries by 
   });
 
   assert.deepEqual(secondOlderPage.items.map((entry) => entry.text), ["one"]);
+  assert.equal(secondOlderPage.nextBeforeIndex, null);
+  assert.equal(secondOlderPage.hasMore, false);
+});
+
+test("pageTranscriptEntries keeps a stable cursor across an in-memory transcript", () => {
+  const transcript = ["one", "two", "three", "four", "five", "six"].map((text, index) => ({
+    id: `entry-${index + 1}`,
+    text,
+    timestamp: `2026-03-21T23:00:0${index}.000Z`
+  }));
+
+  const firstOlderPage = pageTranscriptEntries(transcript, {
+    limit: 2,
+    visibleCount: 2
+  });
+
+  assert.deepEqual(firstOlderPage.items.map((entry) => entry.text), ["three", "four"]);
+  assert.equal(firstOlderPage.nextBeforeIndex, 2);
+  assert.equal(firstOlderPage.hasMore, true);
+  assert.equal(firstOlderPage.totalCount, 6);
+
+  const secondOlderPage = pageTranscriptEntries(transcript, {
+    beforeIndex: firstOlderPage.nextBeforeIndex,
+    limit: 2
+  });
+
+  assert.deepEqual(secondOlderPage.items.map((entry) => entry.text), ["one", "two"]);
   assert.equal(secondOlderPage.nextBeforeIndex, null);
   assert.equal(secondOlderPage.hasMore, false);
 });

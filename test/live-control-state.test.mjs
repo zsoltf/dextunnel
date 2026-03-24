@@ -117,3 +117,29 @@ test("release is a no-op when there is no active lease", () => {
   assert.equal(result.event, null);
   assert.equal(result.recordEvent, false);
 });
+
+test("agent cannot claim over an existing remote lease", () => {
+  const existingLease = setControlLease({
+    clientId: "remote-a",
+    owner: "remote",
+    reason: "compose",
+    source: "remote",
+    threadId: "thread-1",
+    ttlMs: TTL_MS,
+    now: Date.UTC(2026, 2, 18, 23, 5, 0)
+  });
+
+  assert.throws(
+    () =>
+      applyLiveControlAction({
+        action: "claim",
+        clientId: "agent-a",
+        existingLease,
+        source: "agent",
+        threadId: "thread-1",
+        ttlMs: TTL_MS,
+        now: Date.UTC(2026, 2, 18, 23, 5, 10)
+      }),
+    /Remote .* currently holds control/
+  );
+});

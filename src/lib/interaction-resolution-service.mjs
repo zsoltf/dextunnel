@@ -11,6 +11,10 @@ export function createInteractionResolutionService({
   nowIso = () => new Date().toISOString(),
   setControlLease = () => {}
 } = {}) {
+  function isWriterSurface(source) {
+    return source === "remote" || source === "agent";
+  }
+
   function normalizeUserInputAnswers(questions, answers = {}) {
     const payload = {};
 
@@ -51,8 +55,8 @@ export function createInteractionResolutionService({
     }
 
     const authorityClientId = body.authorityClientId || null;
-    if (body.source === "remote" && pending.threadId) {
-      ensureRemoteControlLease(pending.threadId, "remote", authorityClientId);
+    if (isWriterSurface(body.source) && pending.threadId) {
+      ensureRemoteControlLease(pending.threadId, body.source, authorityClientId);
     }
 
     const activeWatcherController = getWatcherController();
@@ -158,12 +162,12 @@ export function createInteractionResolutionService({
       threadId: pending.threadId || null,
       turnId: pending.turnId || null
     };
-    if (body.source === "remote" && pending.threadId) {
+    if (isWriterSurface(body.source) && pending.threadId) {
       setControlLease({
         clientId: authorityClientId,
-        owner: "remote",
+        owner: body.source,
         reason: "interaction",
-        source: "remote",
+        source: body.source,
         threadId: pending.threadId,
         ttlMs: controlLeaseTtlMs
       });

@@ -29,7 +29,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.dextunnel.menubarhost
-        PRODUCT_NAME: DextunnelMenuBarHostApp
+        PRODUCT_NAME: DextunnelHost
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Apps/MenuBarHostApp/Info.plist
         MARKETING_VERSION: 0.1.0

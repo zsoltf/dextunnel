@@ -23,9 +23,20 @@ import { createAttachmentService } from "./lib/attachment-service.mjs";
 import { handleBridgeApiRequest } from "./lib/bridge-api-handler.mjs";
 import { createBridgeStatusBuilder } from "./lib/bridge-status-builder.mjs";
 import {
+  ARAZZO_DOC_PATH,
+  DISCOVERY_MANIFEST_PATH,
+  LLMS_TXT_PATH,
+  OPENAPI_DOC_PATH,
+  buildArazzoDocument,
+  buildLlmsText,
+  buildOpenApiDocument,
+  buildWellKnownManifest
+} from "./lib/discovery-docs.mjs";
+import {
   buildSessionLogSnapshot,
   mapThreadItemToCompanionEntry,
   mapThreadToCompanionSnapshot,
+  pageTranscriptEntries,
   readTranscriptHistoryPageFromSessionLog,
   readTranscriptFromSessionLog
 } from "./lib/codex-app-server-client.mjs";
@@ -213,6 +224,15 @@ function humanizeServerText(value) {
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function requestBaseUrl(req, fallbackHost = "127.0.0.1", fallbackPort = 4317) {
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || "").trim();
+  const proto = forwardedProto || "http";
+  const forwardedHost = String(req.headers["x-forwarded-host"] || "").trim();
+  const hostHeader = String(req.headers.host || "").trim();
+  const authority = forwardedHost || hostHeader || `${fallbackHost}:${fallbackPort}`;
+  return `${proto}://${authority}`;
 }
 
 async function readJsonBody(req) {
@@ -1003,17 +1023,66 @@ function rememberTurnOrigin(threadId, turnId, source) {
 }
 
 async function buildSelectedThreadSnapshotFromLog(thread, { limit = SELECTED_TRANSCRIPT_PAGE_SIZE } = {}) {
-  const snapshot = buildSessionLogSnapshot(thread, {
-    limit,
-    maxBytes: SESSION_LOG_TAIL_BYTES
+  const transcriptLimit = Math.max(1, Number.parseInt(limit, 10) || SELECTED_TRANSCRIPT_PAGE_SIZE);
+  const snapshot = buildLightweightSelectedThreadSnapshotFromLog(thread, {
+    limit: transcriptLimit
   });
 
-  if (snapshot.transcriptCount > 0) {
+  if (Array.isArray(thread?.turns) && thread.turns.length > 0) {
+    const fullSnapshot = mapThreadToCompanionSnapshot(thread, { limit: transcriptLimit });
+    if (fullSnapshot.transcriptCount > snapshot.transcriptCount) {
+      return fullSnapshot;
+    }
+  }
+
+  if (snapshot.transcriptCount >= transcriptLimit) {
     return snapshot;
   }
 
   const fullThread = await codexAppServer.readThread(thread.id, true);
-  return fullThread ? mapThreadToCompanionSnapshot(fullThread, { limit }) : snapshot;
+  if (!fullThread) {
+    return snapshot;
+  }
+
+  const fullSnapshot = mapThreadToCompanionSnapshot(fullThread, { limit: transcriptLimit });
+  return fullSnapshot.transcriptCount > snapshot.transcriptCount ? fullSnapshot : snapshot;
+}
+
+function buildLightweightSelectedThreadSnapshotFromLog(thread, { limit = SELECTED_TRANSCRIPT_PAGE_SIZE } = {}) {
+  const transcriptLimit = Math.max(1, Number.parseInt(limit, 10) || SELECTED_TRANSCRIPT_PAGE_SIZE);
+  if (Array.isArray(thread?.turns) && thread.turns.length > 0) {
+    return mapThreadToCompanionSnapshot(thread, { limit: transcriptLimit });
+  }
+
+  return buildSessionLogSnapshot(thread, {
+    limit: transcriptLimit,
+    maxBytes: SESSION_LOG_TAIL_BYTES
+  });
+}
+
+function selectedThreadSnapshotNeedsDeepHydration(snapshot, {
+  limit = SELECTED_TRANSCRIPT_PAGE_SIZE,
+  thread = null
+} = {}) {
+  const transcriptLimit = Math.max(1, Number.parseInt(limit, 10) || SELECTED_TRANSCRIPT_PAGE_SIZE);
+  if (Array.isArray(thread?.turns) && thread.turns.length > 0) {
+    return false;
+  }
+
+  return Number(snapshot?.transcriptCount || 0) < transcriptLimit;
+}
+
+function buildTranscriptHistoryPageFromThread(thread, {
+  beforeIndex = null,
+  limit = 40,
+  visibleCount = null
+} = {}) {
+  const transcript = mapThreadToCompanionSnapshot(thread, { limit: null }).transcript || [];
+  return pageTranscriptEntries(transcript, {
+    beforeIndex,
+    limit,
+    visibleCount
+  });
 }
 
 async function loadTranscriptHistoryPage({
@@ -1036,16 +1105,40 @@ async function loadTranscriptHistoryPage({
     throw Object.assign(new Error(`Thread ${threadId} not found.`), { statusCode: 404 });
   }
 
-  return readTranscriptHistoryPageFromSessionLog(thread.path, {
+  const logPage = readTranscriptHistoryPageFromSessionLog(thread.path, {
     beforeIndex,
     limit,
     visibleCount
   });
+
+  if (Array.isArray(thread.turns) && thread.turns.length > 0) {
+    const fullPage = buildTranscriptHistoryPageFromThread(thread, {
+      beforeIndex,
+      limit,
+      visibleCount
+    });
+    if (fullPage.totalCount > logPage.totalCount) {
+      return fullPage;
+    }
+  }
+
+  const fullThread = await codexAppServer.readThread(threadId, true);
+  if (!fullThread) {
+    return logPage;
+  }
+
+  const fullPage = buildTranscriptHistoryPageFromThread(fullThread, {
+    beforeIndex,
+    limit,
+    visibleCount
+  });
+  return fullPage.totalCount > logPage.totalCount ? fullPage : logPage;
 }
 
 const threadSyncState = createThreadSyncStateService({
   broadcast,
   buildLivePayload,
+  buildLightweightSelectedThreadSnapshot: buildLightweightSelectedThreadSnapshotFromLog,
   buildSelectedThreadSnapshot: buildSelectedThreadSnapshotFromLog,
   clearControlLease,
   codexAppServer,
@@ -1056,6 +1149,7 @@ const threadSyncState = createThreadSyncStateService({
   nowIso,
   preferredLiveSourceKinds,
   processCwd: () => process.cwd(),
+  snapshotNeedsDeepHydration: selectedThreadSnapshotNeedsDeepHydration,
   selectedTranscriptLimit: SELECTED_TRANSCRIPT_PAGE_SIZE,
   readSelectedThread: (threadId) => codexAppServer.readThread(threadId, false),
   summarizeThread
@@ -1064,6 +1158,7 @@ const threadSyncState = createThreadSyncStateService({
 const {
   createThreadSelectionState,
   mergeSelectedThreadSnapshot,
+  prewarmThreadSnapshots,
   refreshLiveState,
   refreshSelectedThreadSnapshot,
   refreshThreads
@@ -1165,6 +1260,7 @@ const bridgeRuntimeLifecycle = createBridgeRuntimeLifecycleService({
   cleanupAttachmentDir,
   codexAppServer,
   liveState,
+  prewarmThreadSnapshots,
   refreshSelectedThreadSnapshot,
   refreshThreads,
   restartWatcher,
@@ -1273,12 +1369,44 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-  if (req.method === "GET") {
-    await serveStatic(req, res, url.pathname);
-    return;
-  }
+    if (req.method === "GET") {
+      const baseUrl = requestBaseUrl(req, host === "0.0.0.0" ? "127.0.0.1" : host, port);
 
-  sendJson(res, 405, { error: "Method not allowed" });
+      if (url.pathname === DISCOVERY_MANIFEST_PATH) {
+        sendJson(res, 200, buildWellKnownManifest({ baseUrl }));
+        return;
+      }
+
+      if (url.pathname === OPENAPI_DOC_PATH) {
+        sendJson(res, 200, buildOpenApiDocument({ baseUrl }));
+        return;
+      }
+
+      if (url.pathname === ARAZZO_DOC_PATH) {
+        res.writeHead(200, {
+          "Cache-Control": "no-store, max-age=0",
+          "Content-Type": "application/vnd.oai.workflows+json; charset=utf-8",
+          Pragma: "no-cache"
+        });
+        res.end(JSON.stringify(buildArazzoDocument({ baseUrl })));
+        return;
+      }
+
+      if (url.pathname === LLMS_TXT_PATH) {
+        res.writeHead(200, {
+          "Cache-Control": "no-store, max-age=0",
+          "Content-Type": "text/plain; charset=utf-8",
+          Pragma: "no-cache"
+        });
+        res.end(buildLlmsText({ baseUrl }));
+        return;
+      }
+
+      await serveStatic(req, res, url.pathname);
+      return;
+    }
+
+    sendJson(res, 405, { error: "Method not allowed" });
   } catch (error) {
     sendJson(res, errorStatusCode(error, 500), { error: error.message, state: buildLivePayload() });
   }
@@ -1294,13 +1422,13 @@ server.listen(port, host, () => {
   const actualPort = typeof address === "object" && address ? address.port : port;
   const printableHost =
     host === "0.0.0.0"
-      ? "0.0.0.0 (all interfaces; localhost also works)"
+      ? "0.0.0.0 (all interfaces; 127.0.0.1 also works)"
       : host;
   const localOpenHost = host === "0.0.0.0" ? "127.0.0.1" : host;
   const baseUrl = `http://${localOpenHost}:${actualPort}`;
   console.log(`Dextunnel MVP listening on http://${printableHost}:${actualPort}`);
-  console.log(`Setup page: ${baseUrl}/`);
-  console.log(`Remote: ${baseUrl}/remote.html`);
+  console.log(`Remote: ${baseUrl}/`);
+  console.log(`Legacy remote path: ${baseUrl}/remote.html`);
   console.log("Preflight: npm run doctor");
   if (host === "127.0.0.1") {
     console.log("Phone or tablet access: npm run start:network");

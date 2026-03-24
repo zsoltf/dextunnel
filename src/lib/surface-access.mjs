@@ -7,6 +7,14 @@ import { normalizeSurfaceName } from "./shared-room-state.mjs";
 export const DEFAULT_SURFACE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const SURFACE_CAPABILITIES = {
+  agent: [
+    "read_room",
+    "select_room",
+    "refresh_room",
+    "respond_interaction",
+    "control_remote",
+    "send_turn"
+  ],
   host: [
     "read_room",
     "select_room",
@@ -107,9 +115,12 @@ export function createSurfaceAccessRegistry({
   }
 
   function resolve({ headers = {}, searchParams = null } = {}) {
+    const bearerToken = String(headers.authorization || "")
+      .replace(/^Bearer\s+/i, "")
+      .trim();
     const headerToken = String(headers["x-dextunnel-surface-token"] || "").trim();
     const queryToken = String(searchParams?.get?.("surfaceToken") || "").trim();
-    const token = headerToken || queryToken;
+    const token = bearerToken || headerToken || queryToken;
     if (!token || !token.includes(".")) {
       return null;
     }

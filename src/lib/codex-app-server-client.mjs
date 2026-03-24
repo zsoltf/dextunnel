@@ -260,22 +260,13 @@ export function readTranscriptFromSessionLog(threadPath, {
   return transcript.slice(-limit);
 }
 
-export function readTranscriptHistoryPageFromSessionLog(threadPath, {
+export function pageTranscriptEntries(transcript = [], {
   beforeIndex = null,
   limit = 40,
   visibleCount = null
 } = {}) {
-  if (!threadPath) {
-    return {
-      hasMore: false,
-      items: [],
-      nextBeforeIndex: null,
-      totalCount: 0
-    };
-  }
-
-  const transcript = parseTranscriptFromSessionLogText(readUtf8File(threadPath));
-  const totalCount = transcript.length;
+  const normalizedTranscript = Array.isArray(transcript) ? transcript : [];
+  const totalCount = normalizedTranscript.length;
   if (totalCount === 0) {
     return {
       hasMore: false,
@@ -309,10 +300,34 @@ export function readTranscriptHistoryPageFromSessionLog(threadPath, {
 
   return {
     hasMore: start > 0,
-    items: transcript.slice(start, endExclusive),
+    items: normalizedTranscript.slice(start, endExclusive),
     nextBeforeIndex: start > 0 ? start : null,
     totalCount
   };
+}
+
+export function readTranscriptHistoryPageFromSessionLog(threadPath, {
+  beforeIndex = null,
+  limit = 40,
+  visibleCount = null
+} = {}) {
+  if (!threadPath) {
+    return {
+      hasMore: false,
+      items: [],
+      nextBeforeIndex: null,
+      totalCount: 0
+    };
+  }
+
+  return pageTranscriptEntries(
+    parseTranscriptFromSessionLogText(readUtf8File(threadPath)),
+    {
+      beforeIndex,
+      limit,
+      visibleCount
+    }
+  );
 }
 
 export function buildSessionLogSnapshot(thread, {

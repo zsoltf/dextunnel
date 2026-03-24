@@ -178,6 +178,101 @@ test("refreshSelectedThreadSnapshot can use a lightweight selected-thread reader
   assert.equal(liveState.lastError, null);
 });
 
+test("prewarmThreadSnapshots skips the selected room and limits background warming", async () => {
+  const warmed = [];
+  const threadIndex = new Map([
+    ["thr_selected", { cwd: "/tmp/codex/main", id: "thr_selected", name: "Selected" }],
+    ["thr_same_project", { cwd: "/tmp/codex/main", id: "thr_same_project", name: "Same project" }],
+    ["thr_active", { activeTurnId: "turn-1", cwd: "/tmp/codex/other", id: "thr_active", name: "Active elsewhere" }],
+    ["thr_vscode", { cwd: "/tmp/codex/alt", id: "thr_vscode", name: "VSCode", source: "vscode" }],
+    ["thr_tail", { cwd: "/tmp/codex/tail", id: "thr_tail", name: "Tail" }]
+  ]);
+  const { service } = createService({
+    liveState: {
+      lastError: null,
+      lastSyncAt: null,
+      selectedProjectCwd: "/tmp/codex/main",
+      selectedThreadId: "thr_selected",
+      selectedThreadSnapshot: null,
+      selectionSource: "remote",
+      threads: [...threadIndex.values()],
+      turnDiff: null
+    },
+    readSelectedThread: async (threadId) => threadIndex.get(threadId) || null,
+    buildSelectedThreadSnapshot: async (thread) => {
+      warmed.push(thread.id);
+      return {
+        thread: {
+          cwd: thread.cwd,
+          id: thread.id,
+          name: thread.name
+        },
+        transcript: [],
+        transcriptCount: 0
+      };
+    }
+  });
+
+  await service.prewarmThreadSnapshots({ excludeThreadId: "thr_selected" });
+
+  assert.equal(warmed.length, 3);
+  assert.ok(!warmed.includes("thr_selected"));
+});
+
+test("prewarmThreadSnapshots reuses an in-flight snapshot when selection refresh needs the same room", async () => {
+  let resolveSnapshot = null;
+  const buildCalls = [];
+  const thread = {
+    cwd: "/tmp/codex/dextunnel",
+    id: "thr_dextunnel",
+    name: "dextunnel",
+    path: "/tmp/thread.jsonl",
+    preview: "latest assistant reply"
+  };
+  const { liveState, service } = createService({
+    liveState: {
+      lastError: null,
+      lastSyncAt: null,
+      selectedProjectCwd: "/tmp/codex/dextunnel",
+      selectedThreadId: "thr_dextunnel",
+      selectedThreadSnapshot: null,
+      selectionSource: "remote",
+      threads: [thread],
+      turnDiff: null
+    },
+    readSelectedThread: async () => thread,
+    buildSelectedThreadSnapshot: async (candidate) => {
+      buildCalls.push(candidate.id);
+      await new Promise((resolve) => {
+        resolveSnapshot = resolve;
+      });
+      return {
+        thread: {
+          cwd: candidate.cwd,
+          id: candidate.id,
+          name: candidate.name
+        },
+        transcript: [{ role: "assistant", text: "ready" }],
+        transcriptCount: 1
+      };
+    }
+  });
+
+  const prewarmPromise = service.prewarmThreadSnapshots({ maxThreads: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const refreshPromise = service.refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(buildCalls, ["thr_dextunnel"]);
+
+  resolveSnapshot?.();
+  await Promise.all([prewarmPromise, refreshPromise]);
+
+  assert.equal(liveState.selectedThreadSnapshot.thread.id, "thr_dextunnel");
+  assert.deepEqual(buildCalls, ["thr_dextunnel"]);
+});
+
 test("refreshSelectedThreadSnapshot hydrates the selected thread and clears stale errors", async () => {
   const { calls, liveState, service } = createService({
     codexAppServer: {
@@ -209,6 +304,77 @@ test("refreshSelectedThreadSnapshot hydrates the selected thread and clears stal
   assert.equal(liveState.selectedThreadSnapshot.transcript[0].text, "ready");
   assert.equal(liveState.lastSyncAt, "2026-03-20T16:30:00.000Z");
   assert.equal(liveState.lastError, null);
+});
+
+test("refreshSelectedThreadSnapshot shows a quick tail immediately while full hydration continues in background", async () => {
+  let resolveFullSnapshot = null;
+  const thread = {
+    cwd: "/tmp/codex/dextunnel",
+    id: "thr_dextunnel",
+    name: "dextunnel",
+    path: "/tmp/thread.jsonl"
+  };
+  const { calls, liveState, service } = createService({
+    codexAppServer: {
+      listThreads: async () => [],
+      readThread: async () => thread,
+      startThread: async () => ({ id: "thr_new" })
+    },
+    liveState: {
+      lastError: null,
+      lastSyncAt: null,
+      selectedProjectCwd: "/tmp/codex/dextunnel",
+      selectedThreadId: "thr_dextunnel",
+      selectedThreadSnapshot: null,
+      selectionSource: "remote",
+      threads: [{ id: "thr_dextunnel", name: "dextunnel", cwd: "/tmp/codex/dextunnel" }],
+      turnDiff: null
+    },
+    buildLightweightSelectedThreadSnapshot: async () => ({
+      thread: { cwd: thread.cwd, id: thread.id, name: thread.name },
+      transcript: [{ role: "assistant", text: "quick tail" }],
+      transcriptCount: 1
+    }),
+    buildSelectedThreadSnapshot: async () => {
+      await new Promise((resolve) => {
+        resolveFullSnapshot = resolve;
+      });
+      return {
+        thread: { cwd: thread.cwd, id: thread.id, name: thread.name },
+        transcript: [
+          { role: "assistant", text: "older context" },
+          { role: "assistant", text: "quick tail" }
+        ],
+        transcriptCount: 2
+      };
+    },
+    snapshotNeedsDeepHydration: () => true
+  });
+
+  const outcome = await Promise.race([
+    service.refreshSelectedThreadSnapshot().then(() => "resolved"),
+    new Promise((resolve) => setTimeout(() => resolve("timed-out"), 0))
+  ]);
+
+  assert.equal(outcome, "resolved");
+  assert.deepEqual(calls, [
+    ["loadAgentRoom", "thr_dextunnel"],
+    ["broadcast", "live", { selectedThreadId: "thr_dextunnel" }]
+  ]);
+  assert.equal(liveState.selectedThreadSnapshot.transcriptHydrating, true);
+  assert.deepEqual(
+    liveState.selectedThreadSnapshot.transcript.map((entry) => entry.text),
+    ["quick tail"]
+  );
+
+  resolveFullSnapshot?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(liveState.selectedThreadSnapshot.transcriptHydrating, false);
+  assert.deepEqual(
+    [...liveState.selectedThreadSnapshot.transcript.map((entry) => entry.text)].sort(),
+    ["older context", "quick tail"]
+  );
 });
 
 test("refreshSelectedThreadSnapshot updates the room list with hydrated thread summary fields", async () => {

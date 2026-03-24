@@ -17,7 +17,7 @@ func livePayloadDecodesDesktopRestartDiagnostic() throws {
         "source": "vscode",
         "topic": "Advance Dextunnel from semantic companion MVP to safer live mobile control for Codex sessions."
       },
-      "selectedProjectCwd": "/Users/zsolt/dev/codex/dextunnel",
+      "selectedProjectCwd": "/tmp/dextunnel-fixture",
       "selectedThreadId": "thread-1",
       "selectedThreadSnapshot": {
         "channel": {
@@ -28,7 +28,7 @@ func livePayloadDecodesDesktopRestartDiagnostic() throws {
         },
         "thread": {
           "activeTurnId": null,
-          "cwd": "/Users/zsolt/dev/codex/dextunnel",
+          "cwd": "/tmp/dextunnel-fixture",
           "id": "thread-1",
           "name": "dextunnel",
           "source": "vscode",

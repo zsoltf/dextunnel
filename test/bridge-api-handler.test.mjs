@@ -45,6 +45,12 @@ function createDeps(overrides = {}) {
       turnDiff: null,
       writeLock: null
     },
+    loadTranscriptHistoryPage: async () => ({
+      hasMore: false,
+      items: [],
+      nextBeforeIndex: null,
+      totalCount: 0
+    }),
     mapThreadToCompanionSnapshot: (thread) => thread,
     mockAdapter: null,
     nowIso: () => "2026-03-19T00:00:00.000Z",
@@ -158,6 +164,43 @@ test("bridge api handler serves native remote bootstrap without surface auth", a
   ]);
 });
 
+test("bridge api handler serves agent bootstrap without surface auth", async () => {
+  const sent = [];
+  const handled = await handleBridgeApiRequest({
+    req: { headers: {}, method: "GET", socket: { remoteAddress: "192.168.64.10" } },
+    res: {},
+    url: new URL("http://localhost/api/codex-app-server/bootstrap?surface=agent"),
+    deps: createDeps({
+      issueSurfaceBootstrap: (surface) => ({
+        accessToken: `${surface}-token`,
+        capabilities: ["read_room", "send_turn"],
+        clientId: `${surface}-1`,
+        expiresAt: "2026-03-21T00:00:00Z",
+        issuedAt: "2026-03-20T00:00:00Z",
+        surface
+      }),
+      sendJson: (_res, statusCode, payload) => {
+        sent.push({ payload, statusCode });
+      }
+    })
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(sent, [
+    {
+      payload: {
+        accessToken: "agent-token",
+        capabilities: ["read_room", "send_turn"],
+        clientId: "agent-1",
+        expiresAt: "2026-03-21T00:00:00Z",
+        issuedAt: "2026-03-20T00:00:00Z",
+        surface: "agent"
+      },
+      statusCode: 200
+    }
+  ]);
+});
+
 test("bridge api handler blocks host bootstrap for non-loopback clients by default", async () => {
   const sent = [];
   const handled = await handleBridgeApiRequest({
@@ -214,6 +257,47 @@ test("bridge api handler derives selection authority from the signed surface acc
       cwd: null,
       source: "remote",
       threadId: "thr_marketing"
+    }
+  ]);
+});
+
+test("bridge api handler serves transcript history for the selected thread", async () => {
+  const sent = [];
+  const handled = await handleBridgeApiRequest({
+    req: { headers: {}, method: "GET" },
+    res: {},
+    url: new URL("http://localhost/api/codex-app-server/transcript-history?visibleCount=12&limit=40"),
+    deps: createDeps({
+      loadTranscriptHistoryPage: async (params) => {
+        assert.deepEqual(params, {
+          beforeIndex: null,
+          limit: "40",
+          threadId: "thr_dextunnel",
+          visibleCount: "12"
+        });
+        return {
+          hasMore: true,
+          items: [{ id: "entry-1", text: "older" }],
+          nextBeforeIndex: 51,
+          totalCount: 91
+        };
+      },
+      sendJson: (_res, statusCode, payload) => {
+        sent.push({ payload, statusCode });
+      }
+    })
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(sent, [
+    {
+      payload: {
+        hasMore: true,
+        items: [{ id: "entry-1", text: "older" }],
+        nextBeforeIndex: 51,
+        totalCount: 91
+      },
+      statusCode: 200
     }
   ]);
 });

@@ -2,8 +2,16 @@ function normalizeAddress(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-export function isLoopbackAddress(value) {
+function normalizeComparableAddress(value) {
   const address = normalizeAddress(value);
+  if (address.startsWith("::ffff:")) {
+    return address.slice(7);
+  }
+  return address;
+}
+
+export function isLoopbackAddress(value) {
+  const address = normalizeComparableAddress(value);
   if (!address) {
     return false;
   }
@@ -16,8 +24,18 @@ export function isLoopbackAddress(value) {
   );
 }
 
+export function isSameMachineAddress(remoteAddress, localAddress) {
+  const remote = normalizeComparableAddress(remoteAddress);
+  const local = normalizeComparableAddress(localAddress);
+  if (!remote || !local) {
+    return false;
+  }
+  return remote === local;
+}
+
 export function canServeSurfaceBootstrap({
   exposeHostSurface = false,
+  localAddress = "",
   pathname = "",
   remoteAddress = ""
 } = {}) {
@@ -26,5 +44,9 @@ export function canServeSurfaceBootstrap({
     return true;
   }
 
-  return Boolean(exposeHostSurface) || isLoopbackAddress(remoteAddress);
+  return (
+    Boolean(exposeHostSurface) ||
+    isLoopbackAddress(remoteAddress) ||
+    isSameMachineAddress(remoteAddress, localAddress)
+  );
 }

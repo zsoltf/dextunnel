@@ -24,7 +24,7 @@ export function applyLiveControlAction({
     throw new Error("No live session selected.");
   }
 
-  if (nextSource === "remote") {
+  if (nextSource === "remote" || nextSource === "agent") {
     ensureControlActionAllowed({
       action,
       clientId: nextClientId,

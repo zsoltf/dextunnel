@@ -1,5 +1,6 @@
 .DS_Store
 .agent/
+.maintainer/
 AGENTS.md
 GEMINI.md
 .npm-cache/

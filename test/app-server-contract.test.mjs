@@ -15,6 +15,7 @@ test("app-server drift runbook stays aligned with the coded dependency inventory
   const runbookPath = path.join(cwd, APP_SERVER_DRIFT_RUNBOOK_PATH);
   if (!existsSync(runbookPath)) {
     t.skip("local private app-server drift runbook is not present in this clone");
+    return;
   }
   const runbook = readFileSync(runbookPath, "utf8");
 

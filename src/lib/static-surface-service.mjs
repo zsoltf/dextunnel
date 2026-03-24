@@ -23,7 +23,7 @@ export function createStaticSurfaceService({
   }
 
   async function serveStatic(req, res, pathname) {
-    const relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
+    const relativePath = pathname === "/" ? "remote.html" : pathname.slice(1);
     const filePath = path.join(publicDir, relativePath);
 
     try {
@@ -34,6 +34,7 @@ export function createStaticSurfaceService({
         shouldInjectBootstrap &&
         !canServeSurfaceBootstrap({
           exposeHostSurface,
+          localAddress: req.socket?.localAddress || "",
           pathname,
           remoteAddress: req.socket?.remoteAddress || ""
         })

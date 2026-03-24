@@ -93,7 +93,7 @@ test("default composer status explains queueing and busy transitions", () => {
       controlActive: false,
       hasDraftPayload: true
     }),
-    "Steer now will take control and append to the shared thread. Queue stays local until you steer."
+    "Steer now takes control. Queue stays local."
   );
 
   assert.equal(

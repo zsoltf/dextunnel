@@ -1,5 +1,6 @@
 import {
   clearHtmlRenderState,
+  currentSurfaceTranscript,
   createRequestError,
   describeOperatorDiagnostics,
   describeDesktopSyncNote,
@@ -507,9 +508,10 @@ function isNewCommandCard(entry) {
 }
 
 function buildEntries() {
-  const transcript = currentLiveState?.selectedThreadSnapshot?.transcript?.length
-    ? currentLiveState.selectedThreadSnapshot.transcript
-    : currentSnapshot?.transcript || [];
+  const transcript = currentSurfaceTranscript({
+    bootstrapSnapshot: currentSnapshot,
+    liveState: currentLiveState
+  });
   const companionWakeups = currentLiveState?.selectedCompanion?.wakeups || [];
   return [...companionWakeups, ...transcript]
     .filter((entry) => !shouldHideTranscriptEntry(entry))
@@ -660,6 +662,7 @@ function renderStatuses() {
   const selectedChannel = currentLiveState?.selectedChannel || currentLiveState?.selectedThreadSnapshot?.channel || null;
   const selectedAttachments = mergeSurfaceAttachments(currentLiveState?.selectedAttachments || [], localSurfaceAttachment());
   const participants = currentLiveState?.participants || currentLiveState?.selectedThreadSnapshot?.participants || [];
+  const transcriptHydrating = Boolean(currentLiveState?.selectedThreadSnapshot?.transcriptHydrating);
   const remoteControlActive = Boolean(
     status.controlLeaseForSelection &&
       (status.controlLeaseForSelection.owner === "remote" || status.controlLeaseForSelection.source === "remote")
@@ -727,6 +730,8 @@ function renderStatuses() {
 
   if (bridgeState.streamState !== "live") {
     bridgeStatusLine = currentLiveState ? "Reconnecting session bridge..." : "Connecting to session bridge...";
+  } else if (transcriptHydrating) {
+    bridgeStatusLine = "Loading more from the selected room...";
   } else if (status.watcherConnected) {
     const liveBits = [];
     if (remoteControlActive) {

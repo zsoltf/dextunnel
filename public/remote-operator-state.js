@@ -205,7 +205,7 @@ export function defaultComposerStatus({
   }
 
   if (!isSendingReply && !controlActive && composerStatusTone === "neutral" && hasDraftPayload) {
-    return "Steer now will take control and append to the shared thread. Queue stays local until you steer.";
+    return "Steer now takes control. Queue stays local.";
   }
 
   if (!isSendingReply && busy && composerStatusTone === "neutral") {

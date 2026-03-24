@@ -269,13 +269,13 @@ func liveBridgeStoreBootstrapsAndComputesAvailability() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -294,7 +294,7 @@ func liveBridgeStoreBootstrapsAndComputesAvailability() async {
         DextunnelThreadSummary(
             channelLabel: "dextunnel",
             channelSlug: "#dextunnel",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-1",
             name: "dextunnel",
             preview: "hello",
@@ -328,13 +328,13 @@ func liveBridgeStoreQueuesAndSendsDrafts() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -385,13 +385,13 @@ func liveBridgeStoreRemovesAndClearsQueuedDrafts() async throws {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -437,13 +437,13 @@ func liveBridgeStoreDoesNotQueueWhitespaceDrafts() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -483,13 +483,13 @@ func liveBridgeStoreIgnoresCancelledRefreshErrors() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -531,13 +531,13 @@ func liveBridgeStoreSuppressesPassiveTimeoutErrorsFromStream() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -581,13 +581,13 @@ func liveBridgeStoreRestoresDraftsAcrossReconnect() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -638,13 +638,13 @@ func liveBridgeStoreKeepsDraftsScopedPerThread() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "thread-1",
                 source: "vscode",
@@ -663,7 +663,7 @@ func liveBridgeStoreKeepsDraftsScopedPerThread() async {
         DextunnelThreadSummary(
             channelLabel: "thread-1",
             channelSlug: "#thread-1",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-1",
             name: "thread-1",
             preview: nil,
@@ -675,7 +675,7 @@ func liveBridgeStoreKeepsDraftsScopedPerThread() async {
         DextunnelThreadSummary(
             channelLabel: "thread-2",
             channelSlug: "#thread-2",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-2",
             name: "thread-2",
             preview: nil,
@@ -720,7 +720,7 @@ func liveBridgeStoreAppliesLiveEventsAndRevealMessages() async throws {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: nil,
         status: DextunnelLiveStatus(
@@ -789,7 +789,7 @@ func liveBridgeStoreHandlesInteractionAndPresenceUpdates() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: nil,
         status: DextunnelLiveStatus(
@@ -824,13 +824,13 @@ func liveBridgeStoreMarksInterruptedQueuedSendAsFailedOnRestore() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -883,13 +883,13 @@ func liveBridgeStoreMarksInterruptedDirectSendAsFailedOnRestore() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -942,13 +942,13 @@ func liveBridgeStorePersistsPendingDirectSendWhileSendIsInFlight() async throws 
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -1003,13 +1003,13 @@ func liveBridgeStoreRetriesFailedQueuedDrafts() async throws {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -1062,13 +1062,13 @@ func liveBridgeStoreFlushesQueuedDraftsSequentiallyWithoutWaitingForExtraEvents(
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -1114,13 +1114,13 @@ func liveBridgeStoreConfirmsDeliveredDraftWhenTranscriptShowsRemoteTurn() async 
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -1186,13 +1186,13 @@ func liveBridgeStoreBlocksRoomSwitchWhileSending() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "thread-1",
                 source: "vscode",
@@ -1211,7 +1211,7 @@ func liveBridgeStoreBlocksRoomSwitchWhileSending() async {
         DextunnelThreadSummary(
             channelLabel: "thread-1",
             channelSlug: "#thread-1",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-1",
             name: "thread-1",
             preview: nil,
@@ -1223,7 +1223,7 @@ func liveBridgeStoreBlocksRoomSwitchWhileSending() async {
         DextunnelThreadSummary(
             channelLabel: "thread-2",
             channelSlug: "#thread-2",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-2",
             name: "thread-2",
             preview: nil,
@@ -1267,13 +1267,13 @@ func liveBridgeStoreFallsBackToSnapshotThreadIdWhenSelectedThreadIdIsMissing() a
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: nil,
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "thread-1",
                 source: "vscode",
@@ -1418,13 +1418,13 @@ func liveBridgeStoreTreatsOwnerClientIdLeaseAsOwnedControl() async {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -1577,7 +1577,7 @@ func liveBridgeStoreUsesThreadSummariesIncludedInBootstrapPayload() async {
         DextunnelThreadSummary(
             channelLabel: "dextunnel",
             channelSlug: "#dextunnel",
-            cwd: "/Users/zsolt/dev/codex/dextunnel",
+            cwd: "/tmp/dextunnel-fixture",
             id: "thread-1",
             name: "dextunnel",
             preview: "latest from payload",
@@ -1686,13 +1686,13 @@ private enum DextunnelLiveBridgeStoreTests {
                 source: "vscode",
                 topic: "topic"
             ),
-            selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+            selectedProjectCwd: "/tmp/dextunnel-fixture",
             selectedThreadId: threadId,
             selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
                 channel: nil,
                 thread: DextunnelSelectedThread(
                     activeTurnId: nil,
-                    cwd: "/Users/zsolt/dev/codex/dextunnel",
+                    cwd: "/tmp/dextunnel-fixture",
                     id: threadId,
                     name: "dextunnel",
                     source: "vscode",
@@ -1718,7 +1718,7 @@ private enum DextunnelLiveBridgeStoreTests {
                 DextunnelThreadSummary(
                     channelLabel: threadId == "thread-1" ? "dextunnel" : threadId,
                     channelSlug: channelSlug,
-                    cwd: "/Users/zsolt/dev/codex/dextunnel",
+                    cwd: "/tmp/dextunnel-fixture",
                     id: threadId,
                     name: threadId == "thread-1" ? "dextunnel" : threadId,
                     preview: transcriptText,

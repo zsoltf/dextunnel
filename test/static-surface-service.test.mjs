@@ -50,6 +50,36 @@ test("static surface service injects surface bootstrap into remote html", async 
   assert.match(String(res.body), /"accessToken":"remote-token"/);
 });
 
+test("static surface service serves the remote surface at root", async () => {
+  const publicDir = await mkdtemp(path.join(tmpdir(), "dextunnel-static-"));
+  await writeFile(path.join(publicDir, "remote.html"), "<html><body>root remote</body></html>", "utf8");
+
+  const service = createStaticSurfaceService({
+    issueSurfaceBootstrap: (surface) => ({
+      accessToken: `${surface}-token`,
+      surface
+    }),
+    mimeTypes: { ".html": "text/html" },
+    publicDir,
+    sendJson() {
+      throw new Error("sendJson should not be called");
+    }
+  });
+
+  const res = createResponseRecorder();
+  await service.serveStatic(
+    { socket: { remoteAddress: "127.0.0.1" } },
+    res,
+    "/"
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["Content-Type"], "text/html");
+  assert.match(String(res.body), /window\.__DEXTUNNEL_SURFACE_BOOTSTRAP__/);
+  assert.match(String(res.body), /"accessToken":"remote-token"/);
+  assert.match(String(res.body), /root remote/);
+});
+
 test("static surface service blocks host bootstrap for non-loopback clients by default", async () => {
   const publicDir = await mkdtemp(path.join(tmpdir(), "dextunnel-static-"));
   await writeFile(path.join(publicDir, "host.html"), "<html><body>host</body></html>", "utf8");

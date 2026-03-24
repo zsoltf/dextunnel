@@ -9,17 +9,20 @@ REPO_ROOT="$(cd "${APPLE_DIR}/../.." && pwd)"
 
 SCHEME="${DEXTUNNEL_APPLE_SCHEME:-DextunnelMenuBarHostApp}"
 CONFIGURATION="${DEXTUNNEL_APPLE_CONFIGURATION:-Release}"
+APP_NAME="${DEXTUNNEL_APPLE_PRODUCT_NAME:-DextunnelHost}"
 TEAM_ID="${DEXTUNNEL_APPLE_TEAM_ID:-}"
 SIGNING_IDENTITY="${DEXTUNNEL_APPLE_SIGNING_IDENTITY:-Developer ID Application}"
 NOTARY_PROFILE="${DEXTUNNEL_APPLE_NOTARY_PROFILE:-}"
+ZIP_NAME="${DEXTUNNEL_APPLE_ZIP_NAME:-${APP_NAME}-macOS.zip}"
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 DIST_ROOT="${DEXTUNNEL_APPLE_DIST_ROOT:-${APPLE_DIR}/dist/${TIMESTAMP}}"
 ARCHIVE_PATH="${DEXTUNNEL_APPLE_ARCHIVE_PATH:-${DIST_ROOT}/${SCHEME}.xcarchive}"
 EXPORT_DIR="${DEXTUNNEL_APPLE_EXPORT_DIR:-${DIST_ROOT}/export}"
 EXPORT_OPTIONS_PLIST="${DIST_ROOT}/ExportOptions.plist"
-APP_PATH="${EXPORT_DIR}/${SCHEME}.app"
-ZIP_PATH="${DIST_ROOT}/${SCHEME}-macOS.zip"
+APP_PATH="${EXPORT_DIR}/${APP_NAME}.app"
+ZIP_PATH="${DIST_ROOT}/${ZIP_NAME}"
+CHECKSUM_PATH="${ZIP_PATH}.sha256"
 EMBEDDED_NODE_ENTITLEMENTS="${APPLE_DIR}/Apps/MenuBarHostApp/EmbeddedNode.entitlements"
 
 require_command() {
@@ -140,11 +143,16 @@ export_archive() {
 
 zip_exported_app() {
   require_command ditto
+  require_command shasum
   if [[ ! -d "${APP_PATH}" ]]; then
     export_archive
   fi
   rm -f "${ZIP_PATH}"
   ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
+  (
+    cd "${DIST_ROOT}"
+    shasum -a 256 "${ZIP_NAME}" > "$(basename "${CHECKSUM_PATH}")"
+  )
 }
 
 notarize_export() {

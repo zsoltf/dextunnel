@@ -3,7 +3,16 @@ function isoAt(nowMs) {
 }
 
 export function normalizeSurfaceName(value) {
-  return String(value || "").trim().toLowerCase() === "host" ? "host" : "remote";
+  const nextSurface = String(value || "").trim().toLowerCase();
+  if (nextSurface === "host" || nextSurface === "agent" || nextSurface === "remote") {
+    return nextSurface;
+  }
+  return "remote";
+}
+
+function isWriterSurface(surface) {
+  const nextSurface = normalizeSurfaceName(surface);
+  return nextSurface === "remote" || nextSurface === "agent";
 }
 
 export function shortClientId(value) {
@@ -19,7 +28,12 @@ export function shortClientId(value) {
 
 export function surfaceActorLabel({ surface = "", clientId = null } = {}) {
   const nextSurface = normalizeSurfaceName(surface);
-  const base = nextSurface === "host" ? "Host" : "Remote";
+  const base =
+    nextSurface === "host"
+      ? "Host"
+      : nextSurface === "agent"
+        ? "Agent"
+        : "Remote";
   const suffix = shortClientId(clientId);
   return suffix ? `${base} ${suffix}` : base;
 }
@@ -398,21 +412,22 @@ export function ensureControlActionAllowed({
   now = Date.now()
 } = {}) {
   const current = getControlLeaseForThread(lease, threadId, { now });
-  if (!current || source !== "remote") {
+  const nextSource = normalizeSurfaceName(source);
+  if (!current || !isWriterSurface(nextSource)) {
     return current;
   }
 
   const nextClientId = String(clientId || "").trim();
-  const currentOwner = String(current.owner || current.source || "").trim();
+  const currentOwner = normalizeSurfaceName(current.owner || current.source || "");
   const currentOwnerLabel =
     current.ownerLabel || surfaceActorLabel({ surface: current.owner || current.source, clientId: current.ownerClientId });
 
-  if (currentOwner === "remote") {
+  if (currentOwner === nextSource) {
     if (nextClientId && current.ownerClientId && current.ownerClientId === nextClientId) {
       return current;
     }
 
-    throw new Error("Another remote surface currently holds control for this channel.");
+    throw new Error(`Another ${nextSource} surface currently holds control for this channel.`);
   }
 
   throw new Error(`${currentOwnerLabel} currently holds control for this channel.`);
@@ -435,13 +450,14 @@ export function ensureRemoteControlLease({
     now
   });
   const current = getControlLeaseForThread(lease, threadId, { now });
+  const nextSource = normalizeSurfaceName(source);
   if (!current || current.owner !== source) {
-    throw new Error("Take control before sending from the remote.");
+    throw new Error(`Take control before sending from the ${nextSource}.`);
   }
 
   const nextClientId = String(clientId || "").trim();
   if (nextClientId && current.ownerClientId && current.ownerClientId !== nextClientId) {
-    throw new Error("Another remote surface currently holds control for this channel.");
+    throw new Error(`Another ${nextSource} surface currently holds control for this channel.`);
   }
 
   return renewControlLease({

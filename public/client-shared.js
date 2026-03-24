@@ -171,6 +171,31 @@ export function createRequestError(payload = {}, response = {}) {
   return error;
 }
 
+export function currentSurfaceTranscript({ liveState = null, bootstrapSnapshot = null } = {}) {
+  const selectedThreadId = String(liveState?.selectedThreadId || "").trim();
+  const selectedSnapshotThreadId = String(liveState?.selectedThreadSnapshot?.thread?.id || "").trim();
+  const selectedTranscript = Array.isArray(liveState?.selectedThreadSnapshot?.transcript)
+    ? liveState.selectedThreadSnapshot.transcript
+    : [];
+
+  if (selectedThreadId) {
+    return selectedSnapshotThreadId === selectedThreadId ? selectedTranscript : [];
+  }
+
+  if (selectedSnapshotThreadId) {
+    return selectedTranscript;
+  }
+
+  return Array.isArray(bootstrapSnapshot?.transcript) ? bootstrapSnapshot.transcript : [];
+}
+
+export function formatBusyMarqueeText(value = "", fallback = "Loading") {
+  const normalized = String(value || "")
+    .replace(/[.…]+\s*$/u, "")
+    .trim();
+  return normalized || fallback;
+}
+
 export function describeThreadState({ pendingInteraction = null, status = null, thread = null } = {}) {
   if (pendingInteraction) {
     return "action required";
@@ -212,11 +237,11 @@ export function describeRemoteScopeNote({
   channelLabel = ""
 } = {}) {
   if (!hasSelectedThread) {
-    return "Shared room: select a live Codex thread. Drafts and queue stay only on this remote.";
+    return "Pick a thread first.";
   }
 
   const target = String(channelLabel || "").trim() || "the selected thread";
-  return `Shared room: replies append to ${target} on every attached surface. Drafts and queue stay only on this remote.`;
+  return `Shared thread. Sends to ${target}.`;
 }
 
 export function describeRemoteDesktopSyncNote({
@@ -1280,6 +1305,50 @@ export function entryDedupKey(entry) {
   ].join("|");
 }
 
+function normalizedTranscriptOrder(entry) {
+  const order = Number(entry?.transcriptOrder);
+  return Number.isFinite(order) ? order : null;
+}
+
+function normalizedEntryTimestamp(entry) {
+  const ms = new Date(entry?.timestamp || 0).getTime();
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+export function compareEntryChronology(left, right) {
+  const leftOrder = normalizedTranscriptOrder(left);
+  const rightOrder = normalizedTranscriptOrder(right);
+  if (leftOrder != null && rightOrder != null && leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  const leftTimestamp = normalizedEntryTimestamp(left);
+  const rightTimestamp = normalizedEntryTimestamp(right);
+  if (leftTimestamp != null && rightTimestamp != null && leftTimestamp !== rightTimestamp) {
+    return leftTimestamp - rightTimestamp;
+  }
+
+  if (leftOrder != null && rightOrder == null) {
+    return -1;
+  }
+  if (leftOrder == null && rightOrder != null) {
+    return 1;
+  }
+
+  if (leftTimestamp != null && rightTimestamp == null) {
+    return -1;
+  }
+  if (leftTimestamp == null && rightTimestamp != null) {
+    return 1;
+  }
+
+  return 0;
+}
+
+export function compareEntryChronologyDesc(left, right) {
+  return compareEntryChronology(right, left);
+}
+
 export function entryKey(entry) {
   return [
     entry.id || "",
@@ -1666,21 +1735,48 @@ export function startTicker(
   let phraseIndex = 0;
   let charIndex = 0;
   let mode = "typing";
+  let settledText = String(node.textContent || "");
   let timeoutId = null;
   let stopped = false;
+  let transitionAnimation = null;
 
   function queue(nextDelay) {
     timeoutId = window.setTimeout(tick, nextDelay);
   }
 
-  function settle(text) {
+  function settle(text, { animate = false } = {}) {
     stopped = true;
     if (timeoutId != null) {
       window.clearTimeout(timeoutId);
       timeoutId = null;
     }
-    node.textContent = text;
+    const nextText = String(text || "");
+    if (settledText === nextText && node.classList.contains("is-static")) {
+      return;
+    }
+    settledText = nextText;
+    node.textContent = nextText;
     node.classList.add("is-static");
+    if (animate && typeof node.animate === "function") {
+      try {
+        transitionAnimation?.cancel();
+        transitionAnimation = node.animate(
+          [
+            { filter: "blur(0.8px)", opacity: 0.58, transform: "translateY(1px)" },
+            { filter: "blur(0px)", opacity: 1, transform: "translateY(0)" }
+          ],
+          {
+            duration: 180,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+          }
+        );
+        transitionAnimation.addEventListener("finish", () => {
+          transitionAnimation = null;
+        }, { once: true });
+      } catch {
+        transitionAnimation = null;
+      }
+    }
   }
 
   function tick() {
@@ -1729,7 +1825,7 @@ export function startTicker(
 
   return {
     setText(text) {
-      settle(text);
+      settle(text, { animate: true });
     }
   };
 }

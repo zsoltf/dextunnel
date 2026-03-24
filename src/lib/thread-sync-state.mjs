@@ -1,6 +1,7 @@
 export function createThreadSyncStateService({
   broadcast = () => {},
   buildLivePayload = () => ({}),
+  buildLightweightSelectedThreadSnapshot = null,
   clearControlLease = () => {},
   codexAppServer,
   fallbackLiveSourceKinds = ["vscode", "cli"],
@@ -10,6 +11,7 @@ export function createThreadSyncStateService({
   nowIso = () => new Date().toISOString(),
   preferredLiveSourceKinds = ["vscode"],
   processCwd = () => process.cwd(),
+  snapshotNeedsDeepHydration = () => false,
   selectedTranscriptLimit = 120,
   summarizeThread = (thread) => thread,
   buildSelectedThreadSnapshot = (thread, { limit = selectedTranscriptLimit } = {}) => (
@@ -20,7 +22,12 @@ export function createThreadSyncStateService({
 } = {}) {
   const threadSummaryCache = new Map();
   const selectedSnapshotCache = new Map();
+  const selectedSnapshotWarmers = new Map();
   const preservedTranscriptLimit = Math.max(selectedTranscriptLimit * 2, 24);
+  const buildQuickSelectedThreadSnapshot =
+    typeof buildLightweightSelectedThreadSnapshot === "function"
+      ? buildLightweightSelectedThreadSnapshot
+      : null;
 
   function pruneCache(cache, maxEntries = 240) {
     while (cache.size > maxEntries) {
@@ -39,6 +46,44 @@ export function createThreadSyncStateService({
       thread?.path || "",
       thread?.preview || ""
     ].join("|");
+  }
+
+  async function warmSelectedThreadSnapshotForThread(thread, { limit = selectedTranscriptLimit } = {}) {
+    if (!thread?.id) {
+      return null;
+    }
+
+    const snapshotCacheKey = threadCacheKey(thread);
+    const cached = snapshotCacheKey ? selectedSnapshotCache.get(snapshotCacheKey) : null;
+    if (cached) {
+      return cached;
+    }
+
+    const existing = selectedSnapshotWarmers.get(thread.id);
+    if (existing?.cacheKey === snapshotCacheKey) {
+      return existing.promise;
+    }
+
+    const promise = Promise.resolve(buildSelectedThreadSnapshot(thread, { limit }))
+      .then((snapshot) => {
+        if (snapshotCacheKey && snapshot) {
+          selectedSnapshotCache.set(snapshotCacheKey, snapshot);
+          pruneCache(selectedSnapshotCache, 48);
+        }
+        return snapshot;
+      })
+      .finally(() => {
+        const current = selectedSnapshotWarmers.get(thread.id);
+        if (current?.promise === promise) {
+          selectedSnapshotWarmers.delete(thread.id);
+        }
+      });
+
+    selectedSnapshotWarmers.set(thread.id, {
+      cacheKey: snapshotCacheKey,
+      promise
+    });
+    return promise;
   }
 
   function transcriptEntryMergeKey(entry = {}) {
@@ -126,6 +171,94 @@ export function createThreadSyncStateService({
     };
   }
 
+  function setSelectedSnapshotHydrationState(snapshot, transcriptHydrating = false) {
+    if (!snapshot) {
+      return snapshot;
+    }
+
+    return {
+      ...snapshot,
+      transcriptHydrating: Boolean(transcriptHydrating),
+      thread: snapshot.thread
+        ? {
+            ...snapshot.thread,
+            transcriptHydrating: Boolean(transcriptHydrating)
+          }
+        : snapshot.thread
+    };
+  }
+
+  async function refreshThreadSummary(thread) {
+    if (!thread) {
+      return;
+    }
+
+    const summaryCacheKey = threadCacheKey(thread);
+    const summary = threadSummaryCache.get(summaryCacheKey) || await buildThreadSummary(thread);
+    threadSummaryCache.set(summaryCacheKey, summary);
+    pruneCache(threadSummaryCache);
+    const index = liveState.threads.findIndex((entry) => entry.id === thread.id);
+    if (index >= 0) {
+      liveState.threads = liveState.threads.map((entry, entryIndex) => (
+        entryIndex === index
+          ? {
+              ...entry,
+              ...summary,
+              id: entry.id
+            }
+          : entry
+      ));
+    } else {
+      liveState.threads = [summary, ...liveState.threads];
+    }
+  }
+
+  async function commitSelectedThreadSnapshot(thread, snapshot) {
+    const previousSnapshot = liveState.selectedThreadSnapshot;
+    liveState.selectedThreadSnapshot = thread && snapshot
+      ? mergeSelectedThreadSnapshot(previousSnapshot, snapshot)
+      : thread
+        ? snapshot
+        : null;
+    liveState.selectedProjectCwd = thread?.cwd || liveState.selectedProjectCwd;
+    await refreshThreadSummary(thread);
+    liveState.lastSyncAt = nowIso();
+    liveState.lastError = null;
+  }
+
+  function hydrateSelectedThreadSnapshotInBackground(thread, requestedThreadId) {
+    if (!thread?.id || !requestedThreadId) {
+      return;
+    }
+
+    void warmSelectedThreadSnapshotForThread(thread, { limit: selectedTranscriptLimit })
+      .then(async (snapshot) => {
+        if (liveState.selectedThreadId !== requestedThreadId) {
+          return;
+        }
+
+        await commitSelectedThreadSnapshot(
+          thread,
+          setSelectedSnapshotHydrationState(snapshot, false)
+        );
+        broadcast("live", buildLivePayload());
+      })
+      .catch((error) => {
+        if (liveState.selectedThreadId !== requestedThreadId) {
+          return;
+        }
+
+        if (liveState.selectedThreadSnapshot?.thread?.id === requestedThreadId) {
+          liveState.selectedThreadSnapshot = setSelectedSnapshotHydrationState(
+            liveState.selectedThreadSnapshot,
+            false
+          );
+        }
+        liveState.lastError = error?.message || "Thread refresh failed.";
+        broadcast("live", buildLivePayload());
+      });
+  }
+
   function maybePickFallbackSelection() {
     const previousThreadId = liveState.selectedThreadId;
     if (liveState.selectedThreadId && liveState.threads.some((thread) => thread.id === liveState.selectedThreadId)) {
@@ -191,6 +324,62 @@ export function createThreadSyncStateService({
     return hydrated;
   }
 
+  function prewarmPriority(thread, index) {
+    let score = Math.max(0, 40 - index);
+    if (thread?.cwd && thread.cwd === liveState.selectedProjectCwd) {
+      score += 120;
+    }
+    if (thread?.cwd && thread.cwd === processCwd()) {
+      score += 80;
+    }
+    if (thread?.activeTurnId) {
+      score += 24;
+    }
+    if (thread?.source === "vscode") {
+      score += 12;
+    }
+    return score;
+  }
+
+  async function prewarmThreadSnapshots({
+    excludeThreadId = null,
+    limit = selectedTranscriptLimit,
+    maxThreads = 3,
+    threads = liveState.threads
+  } = {}) {
+    const normalizedExcludeThreadId = String(excludeThreadId || "").trim();
+    const candidates = (Array.isArray(threads) ? threads : [])
+      .map((thread, index) => ({
+        index,
+        priority: prewarmPriority(thread, index),
+        thread
+      }))
+      .filter(({ thread }) => thread?.id && thread.id !== normalizedExcludeThreadId)
+      .sort((a, b) => {
+        const priorityDelta = b.priority - a.priority;
+        return priorityDelta !== 0 ? priorityDelta : a.index - b.index;
+      })
+      .slice(0, Math.max(0, Number.parseInt(maxThreads, 10) || 0))
+      .map(({ thread }) => thread);
+
+    for (const thread of candidates) {
+      const cacheKey = threadCacheKey(thread);
+      if (cacheKey && selectedSnapshotCache.has(cacheKey)) {
+        continue;
+      }
+
+      try {
+        const hydratedThread = await readSelectedThread(thread.id);
+        if (!hydratedThread) {
+          continue;
+        }
+        await warmSelectedThreadSnapshotForThread(hydratedThread, { limit });
+      } catch {
+        // Background warmers are a best-effort polish path only.
+      }
+    }
+  }
+
   async function refreshThreads({ broadcastUpdate = true } = {}) {
     try {
       let threads = await codexAppServer.listThreads({
@@ -240,41 +429,49 @@ export function createThreadSyncStateService({
         return;
       }
       const snapshotCacheKey = thread ? threadCacheKey(thread) : null;
-      let snapshot = snapshotCacheKey ? selectedSnapshotCache.get(snapshotCacheKey) : null;
-      if (!snapshot && thread) {
-        snapshot = await buildSelectedThreadSnapshot(thread, { limit: selectedTranscriptLimit });
-        selectedSnapshotCache.set(snapshotCacheKey, snapshot);
-        pruneCache(selectedSnapshotCache, 48);
-      }
-      const previousSnapshot = liveState.selectedThreadSnapshot;
-      liveState.selectedThreadSnapshot = thread && snapshot
-        ? mergeSelectedThreadSnapshot(previousSnapshot, snapshot)
-        : thread
-          ? snapshot
-          : null;
-      liveState.selectedProjectCwd = thread?.cwd || liveState.selectedProjectCwd;
-      if (thread) {
-        const summaryCacheKey = threadCacheKey(thread);
-        const summary = threadSummaryCache.get(summaryCacheKey) || await buildThreadSummary(thread);
-        threadSummaryCache.set(summaryCacheKey, summary);
-        pruneCache(threadSummaryCache);
-        const index = liveState.threads.findIndex((entry) => entry.id === thread.id);
-        if (index >= 0) {
-          liveState.threads = liveState.threads.map((entry, entryIndex) => (
-            entryIndex === index
-              ? {
-                  ...entry,
-                  ...summary,
-                  id: entry.id
-                }
-              : entry
-          ));
-        } else {
-          liveState.threads = [summary, ...liveState.threads];
+      const cachedSnapshot = snapshotCacheKey ? selectedSnapshotCache.get(snapshotCacheKey) : null;
+      if (cachedSnapshot) {
+        await commitSelectedThreadSnapshot(
+          thread,
+          setSelectedSnapshotHydrationState(cachedSnapshot, false)
+        );
+      } else if (thread && buildQuickSelectedThreadSnapshot) {
+        const quickSnapshot = await buildQuickSelectedThreadSnapshot(thread, {
+          limit: selectedTranscriptLimit
+        });
+        if (liveState.selectedThreadId !== requestedThreadId) {
+          return;
         }
+
+        const needsDeepHydration = snapshotNeedsDeepHydration(quickSnapshot, {
+          limit: selectedTranscriptLimit,
+          thread
+        });
+        await commitSelectedThreadSnapshot(
+          thread,
+          setSelectedSnapshotHydrationState(quickSnapshot, needsDeepHydration)
+        );
+        if (needsDeepHydration) {
+          if (broadcastUpdate) {
+            broadcast("live", buildLivePayload());
+          }
+          hydrateSelectedThreadSnapshotInBackground(thread, requestedThreadId);
+          return;
+        }
+      } else if (thread) {
+        const snapshot = await warmSelectedThreadSnapshotForThread(thread, {
+          limit: selectedTranscriptLimit
+        });
+        if (liveState.selectedThreadId !== requestedThreadId) {
+          return;
+        }
+        await commitSelectedThreadSnapshot(
+          thread,
+          setSelectedSnapshotHydrationState(snapshot, false)
+        );
+      } else {
+        liveState.selectedThreadSnapshot = null;
       }
-      liveState.lastSyncAt = nowIso();
-      liveState.lastError = null;
     } catch (error) {
       liveState.lastError = error.message;
     }
@@ -331,6 +528,7 @@ export function createThreadSyncStateService({
     createThreadSelectionState,
     mergeSelectedThreadSnapshot,
     maybePickFallbackSelection,
+    prewarmThreadSnapshots,
     refreshLiveState,
     refreshSelectedThreadSnapshot,
     refreshThreads

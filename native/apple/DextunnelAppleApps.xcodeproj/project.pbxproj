@@ -359,7 +359,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.menubarhost;
-				PRODUCT_NAME = DextunnelMenuBarHostApp;
+				PRODUCT_NAME = DextunnelHost;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};
@@ -382,7 +382,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.dextunnel.menubarhost;
-				PRODUCT_NAME = DextunnelMenuBarHostApp;
+				PRODUCT_NAME = DextunnelHost;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};

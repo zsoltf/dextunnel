@@ -1,7 +1,7 @@
 # Bridge API Contract
 
 Date: 2026-03-19
-Status: working contract
+Status: advanced local integration contract
 
 ## Purpose
 
@@ -9,16 +9,27 @@ This document describes the current local bridge surface that host and remote cl
 
 It is not a public cloud API.
 It is the contract the current browser surfaces depend on, and the contract future native clients should preserve unless a versioned replacement exists.
+It is an advanced integration surface for local automation and power users, not the primary first-use path most people should start with.
 
 ## Transport
 
 - HTTP JSON for request/response routes
 - SSE on `/api/stream` for live updates
 
+## Discovery
+
+- `GET /.well-known/dextunnel.json`
+- `GET /openapi.json`
+- `GET /arazzo.json`
+- `GET /llms.txt`
+
+These discovery endpoints are intentionally unauthenticated so an agent that only knows the base URL can find the bootstrap route, the HTTP schema, the common workflows, and the lightweight LLM-oriented summary.
+
 ## Authority model
 
-- Surface authority comes from a signed bootstrap token injected into `/remote.html` or `/host.html`.
+- Surface authority comes from a signed bootstrap token injected into `/` for the remote surface, the `/remote.html` compatibility alias, or `/host.html`.
 - The token is accepted through:
+  - `Authorization: Bearer <token>` for standard agent and script clients
   - `x-dextunnel-surface-token` on `fetch`
   - `surfaceToken` query param on URL-based paths; today that is mainly used for SSE and `sendBeacon`-style flows, but the runtime accepts it anywhere `searchParams` are available
 - Each token also carries a server-issued surface `clientId`.
@@ -158,6 +169,19 @@ Runtime note:
 - use companion wakeups
 - use the advisory council room
 
+### Agent
+
+- read room
+- select room
+- refresh room
+- respond to pending interactions
+- claim and use remote control
+- send turns
+
+Notes:
+- `agent` is the preferred bootstrap surface for automation and machine clients
+- it intentionally excludes UI-only features such as companion wakeups, agent-room controls, and surface-presence sync
+
 ### Host
 
 - read room
@@ -173,7 +197,7 @@ Runtime note:
 
 - Dextunnel writes to the real persisted Codex session store.
 - Desktop Codex may require a full restart to rehydrate externally written turns.
-- `Reveal in Codex` is a convenience navigation path, not a guaranteed desktop refresh hook.
+- `Reveal in Codex` is a convenience navigation path, not a guaranteed desktop visibility or rehydrate hook.
 - Desktop recovery is manual: quit and reopen the Codex app when you need to see newer turns there.
 
 ## Compatibility rule

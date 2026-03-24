@@ -6,10 +6,10 @@ The public repo keeps a small docs surface on purpose. Some maintainers keep add
 
 ## Start Here
 
-- [README.md](/Users/zsolt/dev/codex/dextunnel/README.md)
-- [CONTRIBUTING.md](/Users/zsolt/dev/codex/dextunnel/CONTRIBUTING.md)
-- [SECURITY.md](/Users/zsolt/dev/codex/dextunnel/SECURITY.md)
-- [SUPPORT.md](/Users/zsolt/dev/codex/dextunnel/SUPPORT.md)
+- [README.md](../README.md)
+- [CONTRIBUTING.md](../CONTRIBUTING.md)
+- [SECURITY.md](../SECURITY.md)
+- [SUPPORT.md](../SUPPORT.md)
 
 ## Product And Operator Docs
 
@@ -17,10 +17,12 @@ The public repo keeps a small docs surface on purpose. Some maintainers keep add
   - Mac host choices: web remote vs signed menu bar host
 - `docs/ops/apple-menubar-release.md`
   - Build, sign, notarize, and package the menu bar app
+- `docs/ops/npm-publish.md`
+  - Advanced manual CLI publishing path from this repo
 - `docs/ops/bridge-api-contract.md`
-  - Current local bridge HTTP and SSE contract for web and native clients
+  - Advanced local bridge HTTP and SSE contract for automation and native clients
 - `docs/ops/desktop-sync.md`
-  - Honest contract for desktop rehydration after remote writes
+  - Honest contract for desktop visibility after remote writes
 
 ## Native App Docs
 

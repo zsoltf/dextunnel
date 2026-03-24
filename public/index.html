@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url=/">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dextunnel</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -10,60 +11,18 @@
   <body class="landing-shell">
     <main class="landing-grid">
       <section class="panel hero-panel">
-        <p class="eyebrow">Dextunnel / browser-first remote</p>
-        <h1>Remote control for Codex sessions that stays transcript-first.</h1>
+        <p class="eyebrow">Dextunnel / remote</p>
+        <h1>Opening the Dextunnel remote.</h1>
         <p class="lede">
-          Dextunnel gives you a live browser remote for Codex sessions: shared rooms,
-          transcript-aware reply flow, approvals, queueing, changes, and tool output,
-          without depending on pixel streaming.
+          The browser landing page has been retired. Dextunnel now opens the main remote surface at the root URL.
         </p>
         <div class="hero-actions">
-          <a class="cta" href="/remote.html">Open remote</a>
-          <button type="button" class="cta cta-subtle" id="preflight-refresh">Refresh check</button>
+          <a class="cta" href="/">Open remote</a>
         </div>
-        <p class="landing-meta">
-          Start here on a fresh install. This page runs a local preflight before you jump into the remote.
-        </p>
-      </section>
-
-      <section class="panel info-panel install-panel">
-        <div class="install-panel-head">
-          <div>
-            <p class="eyebrow">Local preflight</p>
-            <h2>Check the bridge before opening the remote.</h2>
-          </div>
-          <span id="preflight-badge" class="landing-status-badge is-loading">Checking</span>
-        </div>
-        <p id="preflight-summary" class="lede install-summary">
-          Running a local Dextunnel preflight...
-        </p>
-        <div id="preflight-checks" class="preflight-grid" aria-live="polite"></div>
-      </section>
-
-      <section class="panel info-panel">
-        <h2>Quickstart</h2>
-        <ol id="preflight-next-steps" class="plain-list numbered-list">
-          <li>Run <code>npm start</code>.</li>
-          <li>Wait for this page to finish the preflight check.</li>
-          <li>Open the remote once Codex and the bridge are healthy.</li>
-        </ol>
-        <div class="command-block" aria-label="Helpful commands">
-          <p class="command-block-title">Helpful commands</p>
-          <code>npm run doctor</code>
-          <code>npm start</code>
-          <code>npm run start:network</code>
-        </div>
-      </section>
-
-      <section class="panel info-panel">
-        <h2>What it does now</h2>
-        <ul class="plain-list">
-          <li>Shared live bridge across Codex threads and projects</li>
-          <li>Browser-first remote for reply, approvals, queueing, and changes</li>
-          <li>Transcript-aware feed with tool summaries instead of raw session noise</li>
-        </ul>
       </section>
     </main>
-    <script type="module" src="/index.js"></script>
+    <script>
+      window.location.replace("/");
+    </script>
   </body>
 </html>

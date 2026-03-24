@@ -103,8 +103,8 @@ SwiftUI menu bar host surface for:
 - simple approval actions
 - recent activity preview
 - local notifications for pending actions and failed sends while the app is in the background
-- reveal / refresh affordances
-- opening the browser host or remote shell
+- browser-open affordances
+- remote control actions from the menu
 
 ### `DextunnelUniversalIOSShell`
 
@@ -124,7 +124,7 @@ SwiftUI universal operator surface for:
 
 `project.yml` now defines two real app targets:
 
-- `DextunnelMenuBarHostApp`
+- `DextunnelMenuBarHostApp` (produces `DextunnelHost.app`)
 - `DextunnelUniversalIOSOperatorApp`
 
 Shared setup UI lives in:
@@ -135,7 +135,8 @@ The app shells are intentionally simple:
 
 - menu bar host bootstraps from a bridge base URL and exposes status plus browser-open affordances
 - menu bar host is now aimed at a signed macOS menu bar app flow
-- menu bar host prefers the Mac's Tailscale bridge address when Tailscale is installed and connected
+- menu bar host is the primary recommended Mac path; manual npm startup remains the power-user fallback
+- menu bar host now keeps the managed bridge on `127.0.0.1` and publishes the remote through `tailscale serve` on the Mac's normal Tailscale HTTPS URL when Tailscale is installed and connected
 - menu bar host release builds now bundle the bridge runtime plus the Node dylibs it depends on into the app itself
 - menu bar host only starts the app-managed bridge when Tailscale is present, so the native happy path stays opinionated instead of silently exposing a broad listener
 - menu bar host still allows manual repo workflows as the fallback path:
@@ -200,7 +201,7 @@ What is not yet proven:
 
 1. `macOS menu bar host shell`
    - lifecycle
-   - reveal affordances
+   - browser-open affordances
    - notifications
    - trust bootstrap
    - local status / overview
@@ -263,13 +264,13 @@ People who do not want the menu bar host app can still:
 
 - run `npm start`
 - use `/host.html` as the host surface
-- use `/remote.html` or the universal iOS app as the operator surface
+- use `/` or the `/remote.html` compatibility alias, or use the universal iOS app as the operator surface
 
 The menu bar host is additive convenience, not a required install.
 
 ## Address truth
 
-- the app-managed macOS menu bar host now prefers the Mac's Tailscale bridge address when it can launch the bridge itself.
+- the app-managed macOS menu bar host now keeps the bridge on `127.0.0.1` and exposes the operator remote through the Mac's normal Tailscale HTTPS URL.
 - `127.0.0.1` remains the manual fallback when you start the bridge yourself with `npm start`.
 - iPhone and iPad clients should use the Mac's LAN or Tailscale address instead.
 - For remote Apple surfaces, start the bridge with:

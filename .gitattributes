@@ -1,5 +1,6 @@
 .DS_Store export-ignore
 .agent export-ignore
+.maintainer export-ignore
 AGENTS.md export-ignore
 GEMINI.md export-ignore
 .npm-cache export-ignore

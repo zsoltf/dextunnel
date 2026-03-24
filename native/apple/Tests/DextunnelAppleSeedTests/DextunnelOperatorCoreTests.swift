@@ -71,13 +71,13 @@ func menuBarOverviewKeepsDesktopRestartTruthVisible() {
             source: "vscode",
             topic: "topic"
         ),
-        selectedProjectCwd: "/Users/zsolt/dev/codex/dextunnel",
+        selectedProjectCwd: "/tmp/dextunnel-fixture",
         selectedThreadId: "thread-1",
         selectedThreadSnapshot: DextunnelSelectedThreadSnapshot(
             channel: nil,
             thread: DextunnelSelectedThread(
                 activeTurnId: nil,
-                cwd: "/Users/zsolt/dev/codex/dextunnel",
+                cwd: "/tmp/dextunnel-fixture",
                 id: "thread-1",
                 name: "dextunnel",
                 source: "vscode",
@@ -180,7 +180,7 @@ func compactToolPreviewSkipsWrapperLinesAndShowsMeaningfulOutput() {
         Original token count: 42
         Output:
         Success. Updated the following files:
-        /Users/zsolt/dev/codex/dextunnel/native/apple/Sources/DextunnelUniversalIOSShell/UniversalIOSShell.swift
+        /tmp/dextunnel-fixture/native/apple/Sources/DextunnelUniversalIOSShell/UniversalIOSShell.swift
         """
     )
 

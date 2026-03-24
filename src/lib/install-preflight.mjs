@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 
+import { buildDiscoveryLinks } from "./discovery-docs.mjs";
+
 function pluralize(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -161,7 +163,7 @@ function buildNextSteps({
     return [
       "Install Codex locally or set DEXTUNNEL_CODEX_BINARY to the Codex CLI path.",
       "Run npm run doctor again once Codex is available.",
-      `Then open ${baseUrl}/ to confirm the local preflight.`
+      `Then open ${baseUrl}/.`
     ];
   }
 
@@ -177,12 +179,12 @@ function buildNextSteps({
     return [
       `Open Codex in ${workspace.label} once so Dextunnel has a thread to follow.`,
       "Refresh this page or rerun npm run doctor after the thread appears.",
-      `Then open ${baseUrl}/remote.html.`
+      `Then open ${baseUrl}/.`
     ];
   }
 
   return [
-    `Open ${baseUrl}/remote.html.`,
+    `Open ${baseUrl}/.`,
     host === "127.0.0.1"
       ? "Use npm run start:network when you want phone or tablet access over LAN or Tailscale."
       : "This server is already bound beyond loopback for another device on your local network.",
@@ -345,6 +347,7 @@ export async function buildInstallPreflight({
       workspace
     }),
     codexBinary: binary,
+    links: buildDiscoveryLinks({ baseUrl }),
     nextSteps: buildNextSteps({
       appServerHealthy,
       baseUrl,

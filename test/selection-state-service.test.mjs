@@ -26,6 +26,7 @@ function createService(overrides = {}) {
       { cwd: "/tmp/codex/new", id: "thr_new", name: "New" }
     ],
     turnDiff: { diff: "stale", threadId: "thr_old" },
+    watcherConnected: true,
     writeLock: { status: "running", threadId: "thr_old" }
   };
   const appServerState = overrides.appServerState || {
@@ -93,17 +94,44 @@ test("selection service switches threads, refreshes state, and records an event"
   assert.equal(liveState.controlLease, null);
   assert.equal(liveState.interactionFlow, null);
   assert.equal(liveState.turnDiff, null);
+  assert.equal(liveState.watcherConnected, false);
   assert.equal(liveState.writeLock, null);
   assert.equal(appServerState.lastSelectionEvent?.id, "selection-1");
   assert.equal(appServerState.lastSelectionEvent?.toThreadId, "thr_new");
   assert.ok(calls.some((entry) => entry[0] === "scheduleControlLeaseExpiry"));
-  assert.deepEqual(calls.slice(0, 2), [
-    ["scheduleControlLeaseExpiry"],
-    ["refreshSelectedThreadSnapshot", false]
-  ]);
+  assert.ok(calls.some((entry) => entry[0] === "refreshSelectedThreadSnapshot" && entry[1] === true));
   assert.ok(calls.some((entry) => entry[0] === "broadcast"));
   assert.ok(calls.some((entry) => entry[0] === "restartWatcher"));
   assert.ok(calls.some((entry) => entry[0] === "refreshThreads" && entry[1] === true));
+});
+
+test("selection service resolves before slow background hydration settles on thread change", async () => {
+  let resolveRefresh = null;
+  const { calls, liveState, service } = createService({
+    refreshSelectedThreadSnapshot: async ({ broadcastUpdate = true } = {}) => {
+      calls.push(["refreshSelectedThreadSnapshot", broadcastUpdate]);
+      await new Promise((resolve) => {
+        resolveRefresh = resolve;
+      });
+    }
+  });
+
+  const outcome = await Promise.race([
+    service.setSelection({
+      clientId: "remote-a",
+      source: "remote",
+      threadId: "thr_new"
+    }).then(() => "resolved"),
+    new Promise((resolve) => setTimeout(() => resolve("timed-out"), 0))
+  ]);
+
+  assert.equal(outcome, "resolved");
+  assert.equal(liveState.selectedThreadId, "thr_new");
+  assert.equal(liveState.watcherConnected, false);
+  assert.ok(calls.some((entry) => entry[0] === "refreshSelectedThreadSnapshot" && entry[1] === true));
+
+  resolveRefresh?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 test("selection service creates a new thread and rejects busy or blocked cases", async () => {

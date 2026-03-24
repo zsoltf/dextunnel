@@ -146,7 +146,7 @@ export const DEFAULT_MANUAL_CHECKS = [
 
 export const ACCEPTED_LAUNCH_LIMITATIONS = [
   "Desktop Codex still requires a full app restart to reliably rehydrate externally written turns.",
-  "Reveal in Codex is a navigation aid, not a desktop refresh promise.",
+  "Reveal in Codex is a navigation aid, not a desktop visibility promise.",
   "Desktop recovery is manual: quit and reopen the Codex app when you need to see newer turns there."
 ];
 

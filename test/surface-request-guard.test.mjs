@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   canServeSurfaceBootstrap,
+  isSameMachineAddress,
   isLoopbackAddress
 } from "../src/lib/surface-request-guard.mjs";
 
@@ -46,6 +47,19 @@ test("surface request guard keeps host surface loopback-only unless explicitly e
       exposeHostSurface: true,
       pathname: "/host.html",
       remoteAddress: "192.168.64.10"
+      }),
+      true
+  );
+});
+
+test("surface request guard allows same-machine host bootstrap on a bound non-loopback address", () => {
+  assert.equal(isSameMachineAddress("100.125.72.45", "100.125.72.45"), true);
+  assert.equal(isSameMachineAddress("::ffff:100.125.72.45", "100.125.72.45"), true);
+  assert.equal(
+    canServeSurfaceBootstrap({
+      pathname: "/host.html",
+      remoteAddress: "100.125.72.45",
+      localAddress: "100.125.72.45"
     }),
     true
   );

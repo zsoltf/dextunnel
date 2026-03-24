@@ -63,4 +63,4 @@ export const APP_SERVER_ITEM_TYPES = [
   "fileChange"
 ];
 
-export const APP_SERVER_DRIFT_RUNBOOK_PATH = ".agent/private-docs/ops/app-server-drift-runbook.md";
+export const APP_SERVER_DRIFT_RUNBOOK_PATH = ".maintainer/ops/app-server-drift-runbook.md";

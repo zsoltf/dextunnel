@@ -2,12 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  compareEntryChronology,
+  compareEntryChronologyDesc,
+  currentSurfaceTranscript,
   createRequestError,
   describeRemoteDesktopSyncNote,
   describeRemoteScopeNote,
   describeOperatorDiagnostics,
   describeDesktopSyncNote,
   displayTranscriptText,
+  formatBusyMarqueeText,
   formatCardNote,
   formatRecoveryDuration,
   getSurfaceBootstrap,
@@ -66,7 +70,7 @@ test("remote scope note explains shared-thread semantics without sounding like a
     describeRemoteScopeNote({
       hasSelectedThread: false
     }),
-    "Shared room: select a live Codex thread. Drafts and queue stay only on this remote."
+    "Pick a thread first."
   );
 
   assert.equal(
@@ -74,7 +78,7 @@ test("remote scope note explains shared-thread semantics without sounding like a
       hasSelectedThread: true,
       channelLabel: "#dextunnel"
     }),
-    "Shared room: replies append to #dextunnel on every attached surface. Drafts and queue stay only on this remote."
+    "Shared thread. Sends to #dextunnel."
   );
 });
 
@@ -127,6 +131,45 @@ test("request error keeps payload state for immediate client recovery", () => {
   assert.deepEqual(error.state, {
     selectedThreadId: "thread-1"
   });
+});
+
+test("currentSurfaceTranscript stays empty while a selected room is still hydrating", () => {
+  assert.deepEqual(
+    currentSurfaceTranscript({
+      liveState: {
+        selectedThreadId: "thr_dextunnel",
+        selectedThreadSnapshot: null
+      },
+      bootstrapSnapshot: {
+        transcript: [
+          { role: "assistant", text: "bootstrap tail" }
+        ]
+      }
+    }),
+    []
+  );
+
+  assert.deepEqual(
+    currentSurfaceTranscript({
+      liveState: {
+        selectedThreadId: "thr_dextunnel",
+        selectedThreadSnapshot: {
+          thread: { id: "thr_dextunnel" },
+          transcript: [{ role: "assistant", text: "selected tail" }]
+        }
+      },
+      bootstrapSnapshot: {
+        transcript: [{ role: "assistant", text: "bootstrap tail" }]
+      }
+    }).map((entry) => entry.text),
+    ["selected tail"]
+  );
+});
+
+test("formatBusyMarqueeText removes trailing dots for animated busy marquee copy", () => {
+  assert.equal(formatBusyMarqueeText("Loading #dextunnel..."), "Loading #dextunnel");
+  assert.equal(formatBusyMarqueeText("Switching shared room…"), "Switching shared room");
+  assert.equal(formatBusyMarqueeText(""), "Loading");
 });
 
 test("operator diagnostics stay actionable and hide known non-actions", () => {
@@ -192,6 +235,39 @@ test("recovery duration stays compact for operator feedback", () => {
   assert.equal(formatRecoveryDuration(950), "0.9s");
   assert.equal(formatRecoveryDuration(1800), "1.8s");
   assert.equal(formatRecoveryDuration(12500), "13s");
+});
+
+test("entry chronology falls back to transcript order when timestamps are missing", () => {
+  const entries = [
+    { role: "assistant", text: "oldest", transcriptOrder: 0 },
+    { role: "assistant", text: "middle", transcriptOrder: 1 },
+    { role: "assistant", text: "newest", transcriptOrder: 2 }
+  ];
+
+  assert.deepEqual(
+    entries.slice().sort(compareEntryChronology).map((entry) => entry.text),
+    ["oldest", "middle", "newest"]
+  );
+  assert.deepEqual(
+    entries.slice().sort(compareEntryChronologyDesc).map((entry) => entry.text),
+    ["newest", "middle", "oldest"]
+  );
+});
+
+test("entry chronology still honors timestamps for non-transcript entries", () => {
+  const entries = [
+    { role: "assistant", text: "later", timestamp: "2026-03-23T20:52:00.000Z" },
+    { role: "assistant", text: "earlier", timestamp: "2026-03-23T20:48:00.000Z" }
+  ];
+
+  assert.deepEqual(
+    entries.slice().sort(compareEntryChronology).map((entry) => entry.text),
+    ["earlier", "later"]
+  );
+  assert.deepEqual(
+    entries.slice().sort(compareEntryChronologyDesc).map((entry) => entry.text),
+    ["later", "earlier"]
+  );
 });
 
 test("getSurfaceBootstrap prefers a fresh injected token over stored session state", () => {
@@ -263,7 +339,7 @@ Filesystem sandboxing defines which files can be read or written.
   assert.equal(
     shouldHideTranscriptEntry({
       role: "user",
-      text: `# Internal workflow instructions for /Users/zsolt/dev/codex/dextunnel
+      text: `# Internal workflow instructions for /tmp/dextunnel-fixture
 
 <INSTRUCTIONS>
 Use the repository workflow docs.
@@ -276,7 +352,7 @@ Use the repository workflow docs.
     shouldHideTranscriptEntry({
       role: "user",
       text: `<environment_context>
-  <cwd>/Users/zsolt/dev/codex/dextunnel</cwd>
+  <cwd>/tmp/dextunnel-fixture</cwd>
 </environment_context>`
     }),
     true
@@ -303,7 +379,7 @@ test("summarizeRecentTranscript skips leaked internal context entries", () => {
       {
         role: "user",
         text: `<environment_context>
-  <cwd>/Users/zsolt/dev/codex/dextunnel</cwd>
+  <cwd>/tmp/dextunnel-fixture</cwd>
 </environment_context>`
       },
       {
@@ -339,7 +415,7 @@ ok
 test("sessionLabel prefers stable channel labels over preview text", () => {
   const label = sessionLabel({
     channelLabel: "dextunnel",
-    cwd: "/Users/zsolt/dev/codex/dextunnel",
+    cwd: "/tmp/dextunnel-fixture",
     name: "dextunnel",
     preview: "$codex-repo-bootstrap",
     updatedAt: 1774207506
@@ -351,7 +427,7 @@ test("sessionLabel prefers stable channel labels over preview text", () => {
 test("sessionLabel keeps repo-matching thread names instead of opener preview text", () => {
   assert.equal(
     sessionLabel({
-      cwd: "/Users/zsolt/dev/codex/dextunnel",
+      cwd: "/tmp/dextunnel-fixture",
       name: "dextunnel",
       preview: "$codex-repo-bootstrap",
       updatedAt: null
@@ -365,9 +441,9 @@ test("displayTranscriptText compacts updated-file output into a file summary", (
     role: "tool",
     text: `
 Success. Updated the following files:
-M /Users/zsolt/dev/codex/dextunnel/public/remote.js
-M /Users/zsolt/dev/codex/dextunnel/public/styles.css
-M /Users/zsolt/dev/codex/dextunnel/public/client-shared.js
+M /tmp/dextunnel-fixture/public/remote.js
+M /tmp/dextunnel-fixture/public/styles.css
+M /tmp/dextunnel-fixture/public/client-shared.js
 `
   };
 
@@ -475,7 +551,7 @@ test("displayTranscriptText unwraps partial output envelopes", () => {
   assert.equal(
     displayTranscriptText({
       role: "tool",
-      text: '{"output":"Success. Updated the following files:\\nM /Users/zsolt/dev/codex/dextunnel/public/remote.js"}'
+      text: '{"output":"Success. Updated the following files:\\nM /tmp/dextunnel-fixture/public/remote.js"}'
     }),
     "Updated files: remote.js"
   );

@@ -39,34 +39,101 @@ public final class DextunnelNativeBridgeController {
         self.defaultsKey = "dextunnel.native.connection.\(surface.rawValue)"
         self.defaultBaseURLString = defaultBaseURLString
         self.localBridgeManager = resolvedLocalBridgeManager
+        let initialBaseURLString: String
         if
             let data = userDefaults.data(forKey: defaultsKey),
             let saved = try? JSONDecoder().decode(DextunnelNativeConnectionSettings.self, from: data)
         {
-            self.baseURLString = saved.baseURLString
+            initialBaseURLString = saved.baseURLString
         } else {
-            self.baseURLString = Self.defaultConnectionBaseURLString(
+            initialBaseURLString = Self.defaultConnectionBaseURLString(
                 surface: surface,
                 fallbackBaseURLString: defaultBaseURLString,
                 localBridgeManager: resolvedLocalBridgeManager
             )
         }
+        let preferredBaseURLString = Self.preferredHostBaseURLString(
+            initialBaseURLString,
+            surface: surface,
+            localBridgeManager: resolvedLocalBridgeManager
+        )
+        self.baseURLString = preferredBaseURLString
+        if preferredBaseURLString != initialBaseURLString {
+            let settings = DextunnelNativeConnectionSettings(baseURLString: preferredBaseURLString)
+            if let data = try? JSONEncoder().encode(settings) {
+                userDefaults.set(data, forKey: defaultsKey)
+            }
+        }
         self.localBridgeStatusMessage = resolvedLocalBridgeManager?.statusMessage
     }
 
     public var canConnect: Bool {
-        URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+        let hasValidURL = URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+        if surface == .host {
+            return canManageLocalBridge && hasValidURL
+        }
+        return hasValidURL
     }
 
     public var canManageLocalBridge: Bool {
         surface == .host && localBridgeManager?.isAvailable == true
     }
 
+    public var tailscaleInstalled: Bool {
+        surface == .host && localBridgeManager?.tailscaleInstalled == true
+    }
+
+    public var tailscaleConnected: Bool {
+        surface == .host && localBridgeManager?.tailscaleConnected == true
+    }
+
+    public var tailscaleStatusTitle: String {
+        guard surface == .host else {
+            return "Bridge setup"
+        }
+        if !tailscaleInstalled {
+            return "Tailscale required"
+        }
+        if !tailscaleConnected {
+            return "Tailscale not connected"
+        }
+        return "Tailscale ready"
+    }
+
+    public var tailscaleStatusDetail: String {
+        guard surface == .host else {
+            return setupHint
+        }
+        if !tailscaleInstalled {
+            return "Install Tailscale to use Dextunnel Host on this Mac."
+        }
+        if !tailscaleConnected {
+            return "Open Tailscale and connect this Mac to your tailnet before starting Dextunnel Host."
+        }
+        if let managedRemoteURLString {
+            return "Dextunnel Host runs locally on this Mac and shares the remote at \(managedRemoteURLString)."
+        }
+        if let localBridgeStatusMessage, !localBridgeStatusMessage.isEmpty {
+            return localBridgeStatusMessage
+        }
+        return "Tailscale is ready on this Mac."
+    }
+
     public var connectButtonTitle: String {
         guard surface == .host, liveStore == nil else {
             return "Connect"
         }
-        return canManageLocalBridge ? "Start and connect" : "Connect"
+        return canManageLocalBridge ? "Start Dextunnel" : "Tailscale required"
+    }
+
+    public var managedRemoteURLString: String? {
+        guard
+            surface == .host,
+            let baseURL = URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines))
+        else {
+            return nil
+        }
+        return localBridgeManager?.managedRemoteBaseURL(for: baseURL)?.absoluteString
     }
 
     public var setupPlaceholder: String {
@@ -88,12 +155,15 @@ public final class DextunnelNativeBridgeController {
         switch surface {
         case .host:
             if canManageLocalBridge {
-                return "Dextunnel Host prefers this Mac's Tailscale address and can start the managed bridge for you."
+                if let managedRemoteURLString {
+                    return "Dextunnel Host keeps the bridge on this Mac and shares the remote through Tailscale at \(managedRemoteURLString)."
+                }
+                return "Dextunnel Host keeps the bridge on this Mac and shares the remote through Tailscale."
             }
-            return "Dextunnel Host can connect to a manually started bridge. App-managed start is reserved for Macs with Tailscale installed."
+            return "Dextunnel Host requires Tailscale on this Mac. Use the web remote if you want the manual repo workflow."
         case .remote:
             #if targetEnvironment(simulator)
-            return "On Simulator, localhost usually works. For iPhone or iPad, use your Mac's LAN or Tailscale address and start the bridge with `npm run start:network`."
+            return "On Simulator, 127.0.0.1 usually works. For iPhone or iPad, use your Mac's LAN or Tailscale address and start the bridge with `npm run start:network`."
             #else
             return "Use your Mac's LAN or Tailscale address here. Start the bridge with `npm run start:network` when you want iPhone or iPad access."
             #endif
@@ -101,6 +171,15 @@ public final class DextunnelNativeBridgeController {
     }
 
     public func connect() async {
+        guard !isConnecting else {
+            return
+        }
+
+        if surface == .host, !canManageLocalBridge {
+            lastErrorMessage = tailscaleStatusDetail
+            return
+        }
+
         let trimmedBaseURLString = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let requestedBaseURL = URL(string: trimmedBaseURLString) else {
             lastErrorMessage = "Enter a valid bridge URL."
@@ -145,8 +224,19 @@ public final class DextunnelNativeBridgeController {
     }
 
     public func disconnect() {
+        let activeStore = liveStore
+        liveStore = nil
+        syncLocalBridgeStatus()
+        Task { @MainActor in
+            activeStore?.stopStreaming()
+        }
+    }
+
+    public func prepareForTermination() {
+        isConnecting = false
         liveStore?.stopStreaming()
         liveStore = nil
+        localBridgeManager?.stop()
         syncLocalBridgeStatus()
     }
 
@@ -243,7 +333,7 @@ public final class DextunnelNativeBridgeController {
 
             if surface == .host, host != nil, isLoopbackHost(host), hostConnectCodes.contains(urlError.code) {
                 let policyTail = localBridgeStatusMessage.map { " \($0)" } ?? ""
-                return "Couldn't reach the local Dextunnel bridge.\(policyTail) You can still run `npm start` or `npm run start:network` manually, then try Connect again."
+                return "Couldn't reach Dextunnel Host on this Mac.\(policyTail)"
             }
 
             if surface == .remote, remoteConnectCodes.contains(urlError.code) {
@@ -261,9 +351,9 @@ public final class DextunnelNativeBridgeController {
     ) -> String {
         let detail = DextunnelBridgeErrorFormatting.message(for: error)
         if let fallbackStatusMessage, !fallbackStatusMessage.isEmpty, !detail.contains(fallbackStatusMessage) {
-            return "\(detail) \(fallbackStatusMessage) You can still use `npm start` or `npm run start:network` manually for the repo CLI path."
+            return "\(detail) \(fallbackStatusMessage)"
         }
-        return "\(detail) You can still use `npm start` or `npm run start:network` manually for the repo CLI path."
+        return detail
     }
 
     private static let remoteLoopbackCodes: Set<URLError.Code> = [
@@ -304,6 +394,21 @@ public final class DextunnelNativeBridgeController {
             let managedBaseURL = localBridgeManager?.managedBaseURL(for: fallbackURL)
         else {
             return fallbackBaseURLString
+        }
+        return managedBaseURL.absoluteString
+    }
+
+    private static func preferredHostBaseURLString(
+        _ baseURLString: String,
+        surface: DextunnelSurfaceKind,
+        localBridgeManager: DextunnelLocalBridgeManaging?
+    ) -> String {
+        guard
+            surface == .host,
+            let baseURL = URL(string: baseURLString),
+            let managedBaseURL = localBridgeManager?.managedBaseURL(for: baseURL)
+        else {
+            return baseURLString
         }
         return managedBaseURL.absoluteString
     }

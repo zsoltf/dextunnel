@@ -27,6 +27,22 @@ export function createSelectionStateService({
     });
   }
 
+  function hydrateSelectionInBackground(expectedThreadId) {
+    const normalizedThreadId = String(expectedThreadId || "").trim();
+    if (!normalizedThreadId) {
+      return;
+    }
+
+    void refreshSelectedThreadSnapshot({ broadcastUpdate: true }).catch((error) => {
+      if (liveState.selectedThreadId !== normalizedThreadId) {
+        return;
+      }
+
+      liveState.lastError = error?.message || "Thread refresh failed.";
+      broadcast("live", buildLivePayload());
+    });
+  }
+
   function threadDescriptor(threadId, snapshot = null) {
     const id = String(threadId || "").trim();
     if (!id) {
@@ -126,7 +142,12 @@ export function createSelectionStateService({
       scheduleControlLeaseExpiry();
     }
 
-    await refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+    liveState.lastError = null;
+    if (selection.threadChanged) {
+      liveState.watcherConnected = false;
+    } else {
+      await refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+    }
     if (liveState.selectedThreadId && liveState.selectedThreadId !== previousThreadId) {
       recordSelectionEvent({
         actor: source,
@@ -137,6 +158,9 @@ export function createSelectionStateService({
       });
     }
     broadcast("live", buildLivePayload());
+    if (selection.threadChanged) {
+      hydrateSelectionInBackground(liveState.selectedThreadId);
+    }
     restartWatcherInBackground();
     void refreshThreads({ broadcastUpdate: true });
 

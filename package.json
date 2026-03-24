@@ -3,21 +3,35 @@
   "version": "0.1.0",
   "description": "Transcript-first mobile companion for Codex.",
   "license": "Apache-2.0",
-  "private": true,
   "type": "module",
+  "bin": {
+    "dextunnel": "./src/bin/dextunnel.mjs"
+  },
+  "files": [
+    "public",
+    "src",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "SUPPORT.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "doctor": "node src/bin/doctor.mjs",
     "native:host:archive": "cd native/apple && ./scripts/release-menubar-host.sh archive",
     "native:host:export": "cd native/apple && ./scripts/release-menubar-host.sh export",
     "native:host:notarize": "cd native/apple && ./scripts/release-menubar-host.sh notarize",
     "native:host:release": "cd native/apple && ./scripts/release-menubar-host.sh release",
-    "start": "node src/server.mjs",
-    "start:network": "DEXTUNNEL_HOST=0.0.0.0 node src/server.mjs",
+    "start": "node src/bin/dextunnel.mjs serve",
+    "start:network": "node src/bin/dextunnel.mjs serve --network",
     "dev": "node --watch src/server.mjs",
     "launch:attest-manual": "node src/bin/launch-attest.mjs manual-pass",
     "launch:check": "npm test && node src/bin/launch-attest.mjs automated-pass && node src/bin/launch-status.mjs",
     "launch:clear": "node src/bin/launch-attest.mjs clear",
     "launch:status": "node src/bin/launch-status.mjs",
+    "release:check": "npm run doctor && npm test && npm run test:native && node src/bin/launch-attest.mjs automated-pass && node src/bin/launch-status.mjs",
     "smoke:desktop-rehydration": "node src/bin/desktop-rehydration-smoke.mjs",
     "smoke:mobile-proof": "node src/bin/mobile-proof.mjs",
     "smoke:transport": "node src/bin/mobile-transport-smoke.mjs",

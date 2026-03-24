@@ -35,14 +35,17 @@ import { createSurfaceViewState } from "./surface-view-state.js";
 
 import {
   createRequestError,
-  describeRemoteDesktopSyncNote,
+  currentSurfaceTranscript,
   describeOperatorDiagnostics,
   describeRemoteScopeNote,
   clearHtmlRenderState,
+  compareEntryChronology,
+  compareEntryChronologyDesc,
   describeThreadState,
   entryDedupKey,
   entryKey,
   escapeHtml,
+  formatBusyMarqueeText,
   formatSessionTimestamp,
   formatRecoveryDuration,
   formatSurfaceAttachmentSummary,
@@ -89,8 +92,10 @@ const STREAM_RECOVERY_BASE_MS = 700;
 const STREAM_RECOVERY_MAX_MS = 5000;
 const BOOTSTRAP_RETRY_BASE_MS = 900;
 const BOOTSTRAP_RETRY_MAX_MS = 6000;
+const ROOM_STATUS_SETTLE_MS = 300;
 const TRANSCRIPT_HISTORY_PAGE_SIZE = 40;
 const TRANSCRIPT_HISTORY_BOTTOM_THRESHOLD_PX = 220;
+const TRANSCRIPT_HISTORY_RESUME_SCROLL_DELTA_PX = 28;
 const FEED_STICKY_TOP_THRESHOLD_PX = 96;
 const SIDEBAR_MOBILE_BREAKPOINT_PX = 1180;
 const DRAFT_STORAGE_PREFIX = "dextunnel:draft:";
@@ -158,6 +163,8 @@ let lastUserIntentAt = Date.now();
 let draftThreadId = null;
 let selectionIntent = null;
 let selectionRequestVersion = 0;
+let roomStatusHoldThreadId = "";
+let roomStatusHoldUntil = 0;
 let pendingScrollToLatest = false;
 let lastRenderedFeedTopKey = null;
 let expandAllCards = false;
@@ -491,8 +498,70 @@ function settleSelectionIntent() {
   selectionIntent = result.intent;
   if (result.settled) {
     uiState.selecting = false;
+    noteRoomStatusHold(selectedThreadIdFromState(currentLiveState));
   }
   return result.settled;
+}
+
+function selectedThreadIdFromState(state = null) {
+  return String(state?.selectedThreadId || state?.selectedThreadSnapshot?.thread?.id || "").trim();
+}
+
+function noteRoomStatusHold(threadId, holdMs = ROOM_STATUS_SETTLE_MS) {
+  const normalizedThreadId = String(threadId || "").trim();
+  if (!normalizedThreadId) {
+    roomStatusHoldThreadId = "";
+    roomStatusHoldUntil = 0;
+    return;
+  }
+
+  roomStatusHoldThreadId = normalizedThreadId;
+  roomStatusHoldUntil = Date.now() + holdMs;
+}
+
+function syncRoomStatusHold(previousState = null, nextState = null) {
+  const previousThreadId = selectedThreadIdFromState(previousState);
+  const nextThreadId = selectedThreadIdFromState(nextState);
+
+  if (!nextThreadId) {
+    roomStatusHoldThreadId = "";
+    roomStatusHoldUntil = 0;
+    return;
+  }
+
+  if (nextThreadId !== previousThreadId) {
+    noteRoomStatusHold(nextThreadId);
+    return;
+  }
+
+  const previousWatcherConnected = Boolean(previousState?.status?.watcherConnected);
+  const nextWatcherConnected = Boolean(nextState?.status?.watcherConnected);
+  if (previousWatcherConnected && !nextWatcherConnected) {
+    noteRoomStatusHold(nextThreadId);
+    return;
+  }
+
+  if (roomStatusHoldThreadId && roomStatusHoldThreadId !== nextThreadId) {
+    roomStatusHoldThreadId = "";
+    roomStatusHoldUntil = 0;
+  }
+}
+
+function roomStatusPending(thread = null, status = null, snapshot = null) {
+  const threadId = String(thread?.id || "").trim();
+  if (!threadId) {
+    return false;
+  }
+
+  if (Boolean(snapshot?.transcriptHydrating)) {
+    return true;
+  }
+
+  if (!Boolean(status?.watcherConnected)) {
+    return true;
+  }
+
+  return roomStatusHoldThreadId === threadId && Date.now() < roomStatusHoldUntil;
 }
 
 function draftStorageKey(threadId) {
@@ -699,7 +768,7 @@ function uiBusyNotice() {
   const pending = currentLiveState?.pendingInteraction || actionHandoffState || null;
 
   if (uiState.booting) {
-    return { message: "Connecting to session bridge...", tone: "busy" };
+    return { message: "Connecting to Dextunnel...", tone: "busy" };
   }
 
   if (uiState.controlling) {
@@ -1546,6 +1615,14 @@ function resetCardHistoryIfNeeded() {
   for (const key of surfaceViewState.loadExpandedSections(threadId || "none")) {
     expandedFeedSections.add(key);
   }
+  const historyState = historyStateForThread(threadId);
+  if (historyState && historyState.items.length === 0) {
+    historyState.awaitingUserScroll = false;
+    historyState.beforeIndex = null;
+    historyState.hasMore = true;
+    historyState.loading = false;
+    historyState.resumeAfterScrollY = null;
+  }
   hasRenderedOnce = false;
 }
 
@@ -1556,22 +1633,16 @@ function historyStateForThread(threadId = currentThreadId()) {
 
   if (!transcriptHistoryByThreadId.has(threadId)) {
     transcriptHistoryByThreadId.set(threadId, {
+      awaitingUserScroll: false,
       beforeIndex: null,
       hasMore: true,
       items: [],
-      loading: false
+      loading: false,
+      resumeAfterScrollY: null
     });
   }
 
   return transcriptHistoryByThreadId.get(threadId);
-}
-
-function compareEntryTimestampAsc(left, right) {
-  return new Date(left?.timestamp || 0).getTime() - new Date(right?.timestamp || 0).getTime();
-}
-
-function compareEntryTimestampDesc(left, right) {
-  return new Date(right?.timestamp || 0).getTime() - new Date(left?.timestamp || 0).getTime();
 }
 
 function entryMatchesFeedFilter(entry) {
@@ -1617,14 +1688,19 @@ function mergeTranscriptEntries(...groups) {
 }
 
 function currentTranscriptEntries() {
-  const recentTranscript = currentLiveState?.selectedThreadSnapshot?.transcript?.length
-    ? currentLiveState.selectedThreadSnapshot.transcript
-    : currentSnapshot?.transcript || [];
+  const recentTranscript = currentSurfaceTranscript({
+    bootstrapSnapshot: currentSnapshot,
+    liveState: currentLiveState
+  });
   const historyItems = historyStateForThread()?.items || [];
 
   return mergeTranscriptEntries(historyItems, recentTranscript)
+    .map((entry, index) => ({
+      ...entry,
+      transcriptOrder: index
+    }))
     .slice()
-    .sort(compareEntryTimestampAsc);
+    .sort(compareEntryChronology);
 }
 
 function isNewCard(entry) {
@@ -1733,7 +1809,7 @@ function renderFilterButtons(entries) {
   }
 
   if (nodes.expandAllButton) {
-    nodes.expandAllButton.textContent = expandAllCards ? "Compact all" : "Expand all";
+    nodes.expandAllButton.textContent = expandAllCards ? "Collapse" : "Expand";
     nodes.expandAllButton.classList.toggle("is-active", expandAllCards);
   }
 }
@@ -1932,38 +2008,31 @@ function shouldImmediatelyRefreshChanges(previousState, nextState) {
   return false;
 }
 
-function participantSummaryLabel(participant, { controlActive = false } = {}) {
-  if (!participant || participant.role === "system" || participant.role === "advisory") {
-    return "";
-  }
-
-  const label = participant.displayLabel || participant.label || participant.id || "surface";
-  let capability = "observe";
-
-  if (participant.role === "tool") {
-    capability = "tool";
-  } else if (participant.canAct || participant.capability === "write") {
-    capability = participant.token === "remote" && controlActive ? "active" : "writable";
-  }
-
-  return `${label} ${capability}`.trim();
-}
-
 function renderStatuses() {
   const status = currentLiveState?.status || {};
   const liveThread = currentLiveState?.selectedThreadSnapshot?.thread || null;
   const selectedChannel = currentLiveState?.selectedChannel || currentLiveState?.selectedThreadSnapshot?.channel || null;
+  const selectedSnapshot = currentLiveState?.selectedThreadSnapshot || null;
   const selectedAttachments = mergeSurfaceAttachments(currentLiveState?.selectedAttachments || [], localSurfaceAttachment());
-  const participants = (currentLiveState?.participants || currentLiveState?.selectedThreadSnapshot?.participants || []).filter(
-    (participant) => participant?.role !== "advisory"
-  );
   const controlActive = hasRemoteControl(liveThread?.id || "");
+  const roomHydrating = roomStatusPending(liveThread, status, selectedSnapshot);
+  const suppressBridgeDiagnostics = bridgeState.streamState !== "live" || uiState.booting || uiState.selecting;
   const operatorDiagnostics = describeOperatorDiagnostics({
     diagnostics: status.diagnostics || [],
     ownsControl: controlActive,
     status,
     surface: "remote"
-  }).filter((entry) => entry.code !== "host_unavailable");
+  }).filter((entry) => {
+    if (entry.code === "host_unavailable" || entry.code === "bridge_unavailable") {
+      return false;
+    }
+
+    if (suppressBridgeDiagnostics && entry.code === "bridge_last_error") {
+      return false;
+    }
+
+    return true;
+  });
   const busy = threadBusy(status, liveThread);
   const queued = queueSummary(liveThread?.id || "");
   const queuedCount = queuedRepliesForThread(liveThread?.id || "").length;
@@ -1974,20 +2043,14 @@ function renderStatuses() {
     thread: liveThread
   });
   const attachmentSummary = formatSurfaceAttachmentSummary(selectedAttachments);
-  const participantSummary = participants
-    .map((participant) => participantSummaryLabel(participant, { controlActive }))
-    .filter(Boolean)
-    .join(" // ");
   const pendingTitle = uiState.selecting ? selectionIntentTitle(selectionIntent) : "";
   const channelLabel = selectedChannel?.channelSlug || liveThread?.name || (liveThread?.id ? `#${shortThreadId(liveThread.id)}` : "");
   const remoteScopeNote = describeRemoteScopeNote({
     channelLabel,
     hasSelectedThread: Boolean(liveThread?.id)
   });
-  const remoteDesktopSyncNote = describeRemoteDesktopSyncNote({
-    hasSelectedThread: Boolean(liveThread?.id),
-    status
-  });
+  const hasVisibleTranscript = liveThread?.id && currentTranscriptEntries().length > 0;
+  const selectionPendingSnapshot = Boolean(currentLiveState?.selectedThreadId) && !liveThread?.id;
 
   nodes.remoteTitle.textContent = pendingTitle || selectedChannel?.channelSlug || liveThread?.name || currentSnapshot?.session?.title || "#connecting";
   if (operatorDiagnostics.length > 0) {
@@ -2010,34 +2073,43 @@ function renderStatuses() {
     setPanelHidden(nodes.operatorDiagnostics, true);
   }
   const controllerLabel = controlOwnerLabel(status.controlLeaseForSelection || null);
-  const sourceLabel = [selectedChannel?.source, liveThread?.source].find((value) => value && value !== "vscode") || "";
   nodes.remoteTarget.textContent = liveThread?.id
     ? [
         `server ${selectedChannel?.serverLabel || projectLabel(liveThread.cwd || "")}`,
-        sourceLabel,
-        participantSummary,
-        controllerLabel && controlActive ? `${controllerLabel.toLowerCase()} control` : "",
-        threadState !== "ready" ? threadState : "",
-        attachmentSummary
+        attachmentSummary,
+        controllerLabel && controlActive ? `${controllerLabel.toLowerCase()} control` : controlActive ? "control active" : "",
+        queued,
+        threadState !== "ready" ? threadState : ""
       ]
         .filter(Boolean)
         .join(" // ")
     : "Select a project and session.";
   nodes.remoteScopeNote.textContent = remoteScopeNote;
+  setPanelHidden(nodes.remoteScopeNote, true);
   nodes.composerTarget.textContent = liveThread?.id
     ? `${selectedChannel?.channelSlug || `#${shortThreadId(liveThread.id)}`} // shared thread // ${
         queuedCount ? `${queuedCount} queued` : controlActive ? "control active" : "steer ready"
       }`
     : "No live target";
   nodes.composerScopeNote.textContent = remoteScopeNote;
-  nodes.composerSyncNote.textContent = remoteDesktopSyncNote;
+  setPanelHidden(nodes.composerScopeNote, !remoteScopeNote);
+  nodes.composerSyncNote.textContent = "";
+  setPanelHidden(nodes.composerSyncNote, true);
 
-  let bridgeStatusLine = "Starting session bridge...";
+  let bridgeStatusLine = "Loading room...";
   const busyNotice = uiBusyNotice();
 
   if (bridgeState.streamState !== "live") {
-    bridgeStatusLine = currentLiveState ? "Reconnecting session bridge..." : "Connecting to session bridge...";
-  } else if (status.watcherConnected) {
+    bridgeStatusLine = currentLiveState ? "Reconnecting..." : "Connecting...";
+  } else if (liveThread?.id && roomHydrating) {
+    bridgeStatusLine = status.lastError
+      ? `Reconnecting ${channelLabel || "room"}...`
+      : hasVisibleTranscript
+        ? `Loading more from ${channelLabel || "room"}...`
+        : `Loading ${channelLabel || "room"}...`;
+  } else if (selectionPendingSnapshot) {
+    bridgeStatusLine = status.lastError ? `Reconnecting ${channelLabel || "room"}...` : `Loading ${channelLabel || "room"}...`;
+  } else if (status.watcherConnected || hasVisibleTranscript) {
     const liveBits = [];
     if (controlActive) {
       liveBits.push("Remote control active");
@@ -2050,7 +2122,7 @@ function renderStatuses() {
     }
     bridgeStatusLine = liveBits.join(" // ") || "Session bridge online";
   } else if (status.lastError) {
-    bridgeStatusLine = "Session bridge offline";
+    bridgeStatusLine = "Reconnecting...";
   }
 
   if (busyNotice.message) {
@@ -2059,7 +2131,14 @@ function renderStatuses() {
     bridgeStatusLine = transientUiNotice.message;
   }
 
-  marqueeTicker.setText(bridgeStatusLine);
+  const marqueeBusy = (
+    busyNotice.tone === "busy" ||
+    bridgeState.streamState !== "live" ||
+    selectionPendingSnapshot ||
+    (liveThread?.id && roomHydrating)
+  );
+  marqueeTicker.setText(marqueeBusy ? formatBusyMarqueeText(bridgeStatusLine) : bridgeStatusLine);
+  nodes.marquee.classList.toggle("is-busy", marqueeBusy);
   if (transientUiNotice?.message) {
     setUiStatus(transientUiNotice.message, transientUiNotice.tone);
   } else {
@@ -2356,8 +2435,8 @@ function renderFeed() {
   const threadEntries = entries
     .filter((entry) => isConversationEntry(entry) && !isAdvisoryEntry(entry))
     .slice()
-    .sort(compareEntryTimestampDesc);
-  const unifiedEntries = entries.filter((entry) => entryMatchesFeedFilter(entry)).sort(compareEntryTimestampDesc);
+    .sort(compareEntryChronologyDesc);
+  const unifiedEntries = entries.filter((entry) => entryMatchesFeedFilter(entry)).sort(compareEntryChronologyDesc);
 
   if (changesSection) {
     items.push({
@@ -2440,10 +2519,11 @@ async function loadOlderTranscriptHistory() {
 
   const visibleCount = currentTranscriptEntries().length;
   if (!visibleCount) {
-    historyState.hasMore = false;
     return null;
   }
 
+  const previousScrollY = window.scrollY || window.pageYOffset || 0;
+  let loadedOlderItems = false;
   historyState.loading = true;
   render();
 
@@ -2463,13 +2543,23 @@ async function loadOlderTranscriptHistory() {
     historyState.items = mergeTranscriptEntries(payload.items || [], historyState.items || []);
     historyState.beforeIndex = Number.isFinite(payload.nextBeforeIndex) ? payload.nextBeforeIndex : null;
     historyState.hasMore = Boolean(payload.hasMore);
+    loadedOlderItems = Array.isArray(payload.items) && payload.items.length > 0;
+    historyState.awaitingUserScroll = loadedOlderItems;
+    historyState.resumeAfterScrollY = null;
     return payload;
   } catch (error) {
     setTransientUiNotice(error.message || "Could not load older history.", "error", 2400);
+    historyState.awaitingUserScroll = false;
+    historyState.resumeAfterScrollY = null;
     return null;
   } finally {
     historyState.loading = false;
     render();
+    if (loadedOlderItems) {
+      window.requestAnimationFrame(() => {
+        historyState.resumeAfterScrollY = previousScrollY + TRANSCRIPT_HISTORY_RESUME_SCROLL_DELTA_PX;
+      });
+    }
   }
 }
 
@@ -2477,6 +2567,18 @@ function maybeLoadOlderTranscriptHistory() {
   const historyState = historyStateForThread();
   if (!historyState || historyState.loading || historyState.hasMore === false || !feedFilters.thread) {
     return;
+  }
+
+  const currentScrollY = window.scrollY || window.pageYOffset || 0;
+  if (historyState.awaitingUserScroll) {
+    if (!Number.isFinite(historyState.resumeAfterScrollY)) {
+      return;
+    }
+    if (currentScrollY < historyState.resumeAfterScrollY) {
+      return;
+    }
+    historyState.awaitingUserScroll = false;
+    historyState.resumeAfterScrollY = null;
   }
 
   const sentinel = nodes.feed.querySelector('[data-history-sentinel="true"]');
@@ -2533,8 +2635,10 @@ const bridgeLifecycle = createLiveBridgeLifecycle({
     }
   },
   onBootstrapSuccess: ({ snapshot, live }) => {
+    const previousState = currentLiveState;
     currentSnapshot = snapshot;
     currentLiveState = live;
+    syncRoomStatusHold(previousState, currentLiveState);
     settleSelectionIntent();
     clearActionHandoff({ renderNow: false });
     uiState.booting = false;
@@ -2546,6 +2650,7 @@ const bridgeLifecycle = createLiveBridgeLifecycle({
   onLive: (live) => {
     const previousState = currentLiveState;
     currentLiveState = live;
+    syncRoomStatusHold(previousState, currentLiveState);
     settleSelectionIntent();
     handleControlEventNotice(previousState, currentLiveState);
     handleControlLeaseTransition(previousState, currentLiveState);
@@ -2592,7 +2697,9 @@ const bridgeLifecycle = createLiveBridgeLifecycle({
     try {
       const url = background ? `${refreshUrl}?threads=0` : refreshUrl;
       const payload = await requestJson(url, { method: "POST" });
+      const previousState = currentLiveState;
       currentLiveState = payload.state;
+      syncRoomStatusHold(previousState, currentLiveState);
       settleSelectionIntent();
       markLiveActivity();
       scheduleChangesRefresh({ immediate: true, showLoading: !background });
@@ -3319,7 +3426,7 @@ nodes.replyToggleButton.addEventListener("click", () => {
 
   isComposerOpen = !isComposerOpen;
   if (isComposerOpen && !hasRemoteControl()) {
-    setComposerStatus("Steer now will take control and append to the shared thread. Queue stays local until you steer.");
+    setComposerStatus("Steer now takes control. Queue stays local.");
   } else if (isComposerOpen) {
     setComposerStatus("Ready");
   } else {

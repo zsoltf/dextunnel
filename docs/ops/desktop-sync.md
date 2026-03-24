@@ -1,4 +1,4 @@
-# Desktop Sync Contract
+# Desktop Visibility Contract
 
 Date: 2026-03-19
 
@@ -13,7 +13,7 @@ Date: 2026-03-19
 
 - `Reveal in Codex` is a navigation convenience.
 - It brings the desktop app to the selected thread.
-- It is not a guaranteed live-refresh action.
+- It is not a guaranteed live visibility or rehydrate action.
 
 ## What manual desktop recovery means
 
@@ -27,7 +27,7 @@ Date: 2026-03-19
   - negative
 - `thread/resume`:
   - server-side success
-  - negative for desktop view refresh
+  - negative for desktop view visibility
 - Desktop navigation:
   - `View -> Back` then `View -> Forward`: negative
   - `View -> Previous Thread` then `View -> Next Thread`: negative
@@ -52,4 +52,4 @@ npm run smoke:desktop-rehydration -- --thread-id <thread-id> --cwd <repo-cwd>
   - `Reveal in Codex opens this thread in the app. Quit and reopen the Codex app manually to see newer messages from Dextunnel.`
 - Avoid:
   - claiming the desktop app is fully live-synced with Dextunnel
-  - implying `Reveal in Codex` is a refresh guarantee
+  - implying `Reveal in Codex` is a visibility guarantee

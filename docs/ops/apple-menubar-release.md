@@ -3,7 +3,7 @@
 Date: 2026-03-22
 Status: current release path
 
-This is the repo-native path for producing a signed, self-contained `DextunnelMenuBarHostApp` build.
+This is the repo-native path for producing a signed, self-contained `DextunnelHost.app` build from the `DextunnelMenuBarHostApp` Xcode scheme.
 
 ## What the release build includes
 
@@ -74,7 +74,11 @@ Artifacts land in:
 
 - `native/apple/dist/<timestamp>/`
 
-The notarized output is a stapled `.app` plus a zipped copy ready to distribute.
+The notarized output is:
+
+- a stapled `.app`
+- a user-facing zip named after the product, not the internal Xcode scheme
+- a `.sha256` checksum file for the zip
 
 ## Notes
 

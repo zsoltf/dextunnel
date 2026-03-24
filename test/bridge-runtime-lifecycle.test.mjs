@@ -7,6 +7,7 @@ function createService(overrides = {}) {
   const calls = [];
   const liveState = overrides.liveState || {
     lastError: "old-error",
+    selectedThreadId: "thr_dextunnel",
     selectedThreadSnapshot: {
       thread: {
         activeTurnId: "turn-1",
@@ -32,6 +33,8 @@ function createService(overrides = {}) {
       }
     },
     liveState,
+    prewarmThreadSnapshots: async ({ excludeThreadId = null } = {}) =>
+      calls.push(["prewarmThreadSnapshots", excludeThreadId]),
     refreshSelectedThreadSnapshot: async ({ broadcastUpdate = true } = {}) =>
       calls.push(["refreshSelectedThreadSnapshot", broadcastUpdate]),
     refreshThreads: async ({ broadcastUpdate = true } = {}) =>
@@ -103,6 +106,7 @@ test("bridge runtime lifecycle bootstraps attachment cleanup, thread refresh, an
     ["cleanupAttachmentDir"],
     ["refreshThreads", false],
     ["refreshSelectedThreadSnapshot", false],
+    ["prewarmThreadSnapshots", "thr_dextunnel"],
     ["restartWatcher"]
   ]);
 });

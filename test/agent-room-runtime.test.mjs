@@ -80,6 +80,60 @@ test("agent room runtime rejects a malformed participant reply", async () => {
   );
 });
 
+test("agent room runtime requires explicit oracle config for real oracle runs", async () => {
+  const artifactsDir = await mkdtemp(path.join(tmpdir(), "dextunnel-agent-room-oracle-config-"));
+  const runtime = createAgentRoomRuntime({
+    artifactsDir
+  });
+  const prepared = await runtime.prepareRound({
+    contextMarkdown: "# context",
+    roundId: "round-2b",
+    threadId: "thread-2b"
+  });
+
+  const priorRemoteChrome = process.env.DEXTUNNEL_ORACLE_REMOTE_CHROME;
+  const priorProjectUrl = process.env.DEXTUNNEL_ORACLE_PROJECT_URL;
+  const priorOracleRemoteChrome = process.env.ORACLE_REMOTE_CHROME;
+  const priorOracleProjectUrl = process.env.ORACLE_PROJECT_URL;
+  delete process.env.DEXTUNNEL_ORACLE_REMOTE_CHROME;
+  delete process.env.DEXTUNNEL_ORACLE_PROJECT_URL;
+  delete process.env.ORACLE_REMOTE_CHROME;
+  delete process.env.ORACLE_PROJECT_URL;
+
+  try {
+    await assert.rejects(
+      runtime.runParticipant({
+        contextFile: prepared.contextFile,
+        participantId: "oracle",
+        promptText: "Discuss the latest diff.",
+        roundDir: prepared.roundDir
+      }),
+      /Oracle lane requires/
+    );
+  } finally {
+    if (priorRemoteChrome === undefined) {
+      delete process.env.DEXTUNNEL_ORACLE_REMOTE_CHROME;
+    } else {
+      process.env.DEXTUNNEL_ORACLE_REMOTE_CHROME = priorRemoteChrome;
+    }
+    if (priorProjectUrl === undefined) {
+      delete process.env.DEXTUNNEL_ORACLE_PROJECT_URL;
+    } else {
+      process.env.DEXTUNNEL_ORACLE_PROJECT_URL = priorProjectUrl;
+    }
+    if (priorOracleRemoteChrome === undefined) {
+      delete process.env.ORACLE_REMOTE_CHROME;
+    } else {
+      process.env.ORACLE_REMOTE_CHROME = priorOracleRemoteChrome;
+    }
+    if (priorOracleProjectUrl === undefined) {
+      delete process.env.ORACLE_PROJECT_URL;
+    } else {
+      process.env.ORACLE_PROJECT_URL = priorOracleProjectUrl;
+    }
+  }
+});
+
 test("agent room runtime fake failures fire once so retries can recover", async () => {
   const artifactsDir = await mkdtemp(path.join(tmpdir(), "dextunnel-agent-room-fake-failures-"));
   const runtime = createAgentRoomRuntime({

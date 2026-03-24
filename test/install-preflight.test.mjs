@@ -62,8 +62,10 @@ test("buildInstallPreflight reports ready when Codex and workspace threads are h
   assert.equal(payload.status, "ready");
   assert.equal(payload.workspace.cwdThreadCount, 1);
   assert.equal(payload.appServer.healthy, true);
+  assert.equal(payload.links.manifest, "http://127.0.0.1:4317/.well-known/dextunnel.json");
+  assert.equal(payload.links.openapi, "http://127.0.0.1:4317/openapi.json");
   assert.match(payload.summary, /Dextunnel is ready/i);
-  assert.equal(payload.nextSteps[0], "Open http://127.0.0.1:4317/remote.html.");
+  assert.equal(payload.nextSteps[0], "Open http://127.0.0.1:4317/.");
 });
 
 test("buildInstallPreflight reports warning when Codex is healthy but the workspace has no thread yet", async () => {

@@ -267,6 +267,46 @@ function createSurfaceSseClient(server, surface, path = "/api/stream") {
   });
 }
 
+test("server integration serves discovery docs and allows bearer-auth live-state reads", async () => {
+  const server = await startTestServer();
+
+  try {
+    const manifestResponse = await fetch(`${server.url}/.well-known/dextunnel.json`);
+    const manifest = await manifestResponse.json();
+    assert.equal(manifestResponse.ok, true);
+    assert.equal(manifest.preferredBootstrapSurface, "agent");
+    assert.match(manifest.links.openapi, /\/openapi\.json$/);
+
+    const openapiResponse = await fetch(`${server.url}/openapi.json`);
+    const openapi = await openapiResponse.json();
+    assert.equal(openapiResponse.ok, true);
+    assert.equal(openapi.paths["/api/codex-app-server/turn"].post.operationId, "sendTurn");
+
+    const llmsResponse = await fetch(`${server.url}/llms.txt`);
+    const llms = await llmsResponse.text();
+    assert.equal(llmsResponse.ok, true);
+    assert.match(llms, /Authorization: Bearer <accessToken>/);
+
+    const bootstrapResponse = await fetch(
+      `${server.url}/api/codex-app-server/bootstrap?surface=agent`
+    );
+    const bootstrap = await bootstrapResponse.json();
+    assert.equal(bootstrapResponse.ok, true);
+    assert.equal(bootstrap.surface, "agent");
+
+    const liveStateResponse = await fetch(`${server.url}/api/codex-app-server/live-state`, {
+      headers: {
+        Authorization: `Bearer ${bootstrap.accessToken}`
+      }
+    });
+    const liveState = await liveStateResponse.json();
+    assert.equal(liveStateResponse.ok, true);
+    assert.equal(liveState.selectedThreadId, "thr_dextunnel");
+  } finally {
+    await server.close();
+  }
+});
+
 test("server integration broadcasts shared-room selection to multiple SSE clients", async () => {
   const server = await startTestServer();
   const streamA = createSurfaceSseClient(server, "remote");

@@ -4,6 +4,7 @@ export function createBridgeRuntimeLifecycleService({
   cleanupAttachmentDir = async () => {},
   codexAppServer,
   liveState,
+  prewarmThreadSnapshots = async () => {},
   refreshSelectedThreadSnapshot = async () => {},
   refreshThreads = async () => {},
   restartWatcher = async () => {},
@@ -39,6 +40,7 @@ export function createBridgeRuntimeLifecycleService({
     await cleanupAttachmentDir();
     await refreshThreads({ broadcastUpdate: false });
     await refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+    void prewarmThreadSnapshots({ excludeThreadId: liveState.selectedThreadId });
     await restartWatcher();
   }
 

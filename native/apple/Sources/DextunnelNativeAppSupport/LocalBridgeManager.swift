@@ -5,25 +5,48 @@ public protocol DextunnelLocalBridgeManaging: AnyObject {
     var isAvailable: Bool { get }
     var isRunning: Bool { get }
     var statusMessage: String? { get }
+    var tailscaleInstalled: Bool { get }
+    var tailscaleConnected: Bool { get }
 
     func managedBaseURL(for requestedBaseURL: URL) -> URL?
+    func managedRemoteBaseURL(for requestedBaseURL: URL) -> URL?
     func start(baseURL: URL) async throws
     func stop()
 }
 
 #if os(macOS)
+struct DextunnelTailscaleStatus: Equatable, Sendable {
+    let dnsName: String?
+    let ipv4Address: String?
+
+    var trimmedDNSName: String? {
+        guard var dnsName else {
+            return nil
+        }
+        while dnsName.hasSuffix(".") {
+            dnsName.removeLast()
+        }
+        return dnsName.isEmpty ? nil : dnsName
+    }
+}
+
 struct DextunnelLocalBridgeCommand: Equatable, Sendable {
     let executableURL: URL
     let arguments: [String]
     var environment: [String: String]
     let repoRootURL: URL
     let baseURL: URL
+    let remoteBaseURL: URL
+    let tailscaleExecutableURL: URL
 }
 
 struct DextunnelLocalBridgeAvailability: Equatable, Sendable {
     let command: DextunnelLocalBridgeCommand?
     let issue: DextunnelLocalBridgeLaunchError?
     let statusMessage: String
+    let tailscaleInstalled: Bool
+    let tailscaleConnected: Bool
+    let tailscaleRemoteBaseURL: URL?
 }
 
 enum DextunnelLocalBridgeLaunchError: LocalizedError, Equatable {
@@ -31,6 +54,8 @@ enum DextunnelLocalBridgeLaunchError: LocalizedError, Equatable {
     case missingRepoRoot
     case missingTailscale
     case tailscaleAddressUnavailable
+    case tailscaleServeConflict(String)
+    case tailscaleServeConfigurationFailed(String)
     case failedToStart(String)
     case timedOut(String)
 
@@ -41,9 +66,13 @@ enum DextunnelLocalBridgeLaunchError: LocalizedError, Equatable {
         case .missingRepoRoot:
             return "Couldn't find the Dextunnel repo root needed to launch the local bridge."
         case .missingTailscale:
-            return "Install Tailscale before Dextunnel Host starts the managed bridge."
+            return "Install Tailscale before Dextunnel Host can run."
         case .tailscaleAddressUnavailable:
-            return "Tailscale is installed, but this Mac is not connected to a tailnet address yet."
+            return "Tailscale is installed, but this Mac is not ready for a tailnet share yet."
+        case .tailscaleServeConflict(let detail):
+            return detail
+        case .tailscaleServeConfigurationFailed(let detail):
+            return detail
         case .failedToStart(let detail):
             return detail
         case .timedOut(let detail):
@@ -57,12 +86,19 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
     public private(set) var statusMessage: String?
     public var isRunning: Bool { process?.isRunning == true }
     public var isAvailable: Bool {
-        availabilityResolver().command != nil
+        availability.command != nil
+    }
+    public var tailscaleInstalled: Bool {
+        availability.tailscaleInstalled
+    }
+    public var tailscaleConnected: Bool {
+        availability.tailscaleConnected
     }
 
     private let availabilityResolver: () -> DextunnelLocalBridgeAvailability
     private let processFactory: () -> Process
     private let session: URLSession
+    private var availability: DextunnelLocalBridgeAvailability
     private var process: Process?
     private var startupLogTail: [String] = []
 
@@ -73,14 +109,16 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         processFactory: @escaping () -> Process = Process.init,
         session: URLSession = .shared
     ) {
+        let initialAvailability = availabilityResolver()
         self.availabilityResolver = availabilityResolver
         self.processFactory = processFactory
         self.session = session
-        self.statusMessage = availabilityResolver().statusMessage
+        self.availability = initialAvailability
+        self.statusMessage = initialAvailability.statusMessage
     }
 
     public func managedBaseURL(for requestedBaseURL: URL) -> URL? {
-        let availability = availabilityResolver()
+        let availability = self.availability
         guard let baseURL = availability.command?.baseURL else {
             return nil
         }
@@ -101,19 +139,25 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         return components.url
     }
 
+    public func managedRemoteBaseURL(for requestedBaseURL: URL) -> URL? {
+        availability.command?.remoteBaseURL
+    }
+
     public func start(baseURL: URL) async throws {
         if process?.isRunning == true {
             let runningURL = managedBaseURL(for: baseURL) ?? baseURL
-            statusMessage = "Managed bridge already running at \(runningURL.absoluteString)."
+            let remoteURL = managedRemoteBaseURL(for: baseURL)
+            statusMessage = runningStatusMessage(localBaseURL: runningURL, remoteBaseURL: remoteURL)
             return
         }
 
-        let availability = availabilityResolver()
+        let availability = refreshAvailability()
         guard var command = availability.command else {
             statusMessage = availability.statusMessage
             throw availability.issue ?? DextunnelLocalBridgeLaunchError.missingRepoRoot
         }
         let effectiveBaseURL = managedBaseURL(for: baseURL) ?? baseURL
+        let effectiveRemoteBaseURL = managedRemoteBaseURL(for: baseURL)
         command.environment["DEXTUNNEL_HOST"] = effectiveBaseURL.host ?? command.baseURL.host
         if let port = effectiveBaseURL.port {
             command.environment["PORT"] = String(port)
@@ -144,7 +188,7 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             }
         }
 
-        statusMessage = "Starting the managed Tailscale bridge at \(effectiveBaseURL.absoluteString)..."
+        statusMessage = "Starting Dextunnel Host locally at \(effectiveBaseURL.absoluteString)..."
         do {
             try process.run()
             self.process = process
@@ -156,10 +200,16 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
 
         do {
             try await waitUntilReachable(baseURL: effectiveBaseURL)
-            statusMessage = "Managed Tailscale bridge running at \(effectiveBaseURL.absoluteString)."
+            try ensureManagedServe(localBaseURL: effectiveBaseURL, remoteBaseURL: effectiveRemoteBaseURL, command: command)
+            statusMessage = runningStatusMessage(localBaseURL: effectiveBaseURL, remoteBaseURL: effectiveRemoteBaseURL)
         } catch {
             stop()
             let tail = startupLogTail.last.map { " Last log: \($0)" } ?? ""
+            if let launchError = error as? DextunnelLocalBridgeLaunchError {
+                statusMessage = launchError.localizedDescription
+                throw launchError
+            }
+
             let detail = "The managed bridge did not become reachable in time.\(tail)"
             statusMessage = detail
             throw DextunnelLocalBridgeLaunchError.timedOut(detail)
@@ -167,18 +217,24 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
     }
 
     public func stop() {
-        guard let process else {
-            statusMessage = isAvailable
-                ? availabilityResolver().statusMessage
-                : availabilityResolver().statusMessage
-            return
-        }
-
-        if process.isRunning {
+        if let process, process.isRunning {
             process.terminate()
         }
         self.process = nil
-        statusMessage = "Stopped the app-managed Tailscale bridge."
+
+        if let command = availability.command {
+            do {
+                try stopManagedServeIfNeeded(command: command)
+            } catch {
+                startupLogTail.append("tailscale serve cleanup failed: \(error.localizedDescription)")
+                if startupLogTail.count > 8 {
+                    startupLogTail = Array(startupLogTail.suffix(8))
+                }
+            }
+        }
+
+        let refreshedAvailability = refreshAvailability()
+        statusMessage = refreshedAvailability.statusMessage
     }
 
     private func appendStartupLog(_ text: String) {
@@ -198,10 +254,7 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         }
 
         process = nil
-        let code = terminated.terminationStatus
-        statusMessage = code == 0
-            ? "The app-managed Tailscale bridge stopped."
-            : "The app-managed Tailscale bridge exited with code \(code)."
+        statusMessage = refreshAvailability().statusMessage
     }
 
     private func waitUntilReachable(baseURL: URL) async throws {
@@ -232,38 +285,61 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         compileTimeFilePath: String = #filePath,
         bundleResourceURL: URL? = Bundle.main.resourceURL,
         tailscaleInstalled: Bool? = nil,
-        tailscaleIPv4Address: String? = nil
+        tailscaleIPv4Address: String? = nil,
+        tailscaleDNSName: String? = nil,
+        tailscaleServeStatusData: Data? = nil
     ) -> DextunnelLocalBridgeAvailability {
         let tailscaleExecutable = defaultTailscaleExecutable(environment: environment, fileManager: fileManager)
+        let resolvedTailscaleExecutable = tailscaleExecutable ?? URL(fileURLWithPath: "/usr/bin/true")
         let hasTailscale = tailscaleInstalled ?? (tailscaleExecutable != nil)
         guard hasTailscale else {
             return DextunnelLocalBridgeAvailability(
                 command: nil,
                 issue: .missingTailscale,
-                statusMessage: "Install Tailscale before Dextunnel Host starts the managed bridge. Manual npm runs still work."
+                statusMessage: "Dextunnel Host requires Tailscale on this Mac.",
+                tailscaleInstalled: false,
+                tailscaleConnected: false,
+                tailscaleRemoteBaseURL: nil
             )
         }
 
-        let resolvedTailscaleAddress = tailscaleIPv4Address ?? defaultTailscaleIPv4Address(
+        let resolvedTailscaleStatus = defaultTailscaleStatus(
             executableURL: tailscaleExecutable,
             environment: environment
-        )
-        guard let tailscaleAddress = resolvedTailscaleAddress, !tailscaleAddress.isEmpty else {
+        ) ?? DextunnelTailscaleStatus(dnsName: tailscaleDNSName, ipv4Address: tailscaleIPv4Address)
+        guard let tailscaleDNSName = resolvedTailscaleStatus.trimmedDNSName, !tailscaleDNSName.isEmpty else {
             return DextunnelLocalBridgeAvailability(
                 command: nil,
                 issue: .tailscaleAddressUnavailable,
-                statusMessage: "Tailscale is installed, but this Mac is not connected to a tailnet address yet. Open Tailscale, then try again."
+                statusMessage: "Open Tailscale and connect this Mac to your tailnet before starting Dextunnel Host.",
+                tailscaleInstalled: true,
+                tailscaleConnected: false,
+                tailscaleRemoteBaseURL: nil
             )
         }
 
         var launchEnvironment = environment
         launchEnvironment["PATH"] = mergedSearchPath(environment: environment)
-        launchEnvironment["DEXTUNNEL_HOST"] = tailscaleAddress
+        launchEnvironment["DEXTUNNEL_HOST"] = "127.0.0.1"
 
         let port = Int(environment["PORT"] ?? "") ?? 4317
-        let baseURL = URL(string: "http://\(tailscaleAddress):\(port)")!
+        let baseURL = URL(string: "http://127.0.0.1:\(port)")!
+        let existingServeStatus = tailscaleServeStatusData.flatMap { try? DextunnelServeStatus(data: $0) }
+            ?? (try? readServeStatus(
+                executableURL: resolvedTailscaleExecutable,
+                environment: launchEnvironment,
+                processFactory: Process.init
+            ))
+        let remoteBaseURL = preferredRemoteBaseURL(
+            dnsName: tailscaleDNSName,
+            localPort: port,
+            existingServeStatus: existingServeStatus,
+            desiredProxy: baseURL.absoluteString
+        )
         if let embeddedCommand = embeddedBridgeCommand(
             baseURL: baseURL,
+            remoteBaseURL: remoteBaseURL,
+            tailscaleExecutableURL: resolvedTailscaleExecutable,
             bundleResourceURL: bundleResourceURL,
             environment: launchEnvironment,
             fileManager: fileManager
@@ -271,7 +347,10 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             return DextunnelLocalBridgeAvailability(
                 command: embeddedCommand,
                 issue: nil,
-                statusMessage: "Tailscale ready. Dextunnel Host can start its bundled bridge at \(baseURL.absoluteString)."
+                statusMessage: "Tailscale ready. Dextunnel Host can run locally at \(baseURL.absoluteString) and share the remote at \(remoteBaseURL.absoluteString).",
+                tailscaleInstalled: true,
+                tailscaleConnected: true,
+                tailscaleRemoteBaseURL: remoteBaseURL
             )
         }
 
@@ -283,7 +362,10 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             return DextunnelLocalBridgeAvailability(
                 command: nil,
                 issue: .missingRepoRoot,
-                statusMessage: "Local bridge launch is unavailable from this build."
+                statusMessage: "Local bridge launch is unavailable from this build.",
+                tailscaleInstalled: true,
+                tailscaleConnected: true,
+                tailscaleRemoteBaseURL: remoteBaseURL
             )
         }
 
@@ -291,7 +373,10 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             return DextunnelLocalBridgeAvailability(
                 command: nil,
                 issue: .missingNode,
-                statusMessage: "Install Node, or point DEXTUNNEL_NODE_BINARY at it, before Dextunnel Host starts the managed bridge."
+                statusMessage: "Install Node, or point DEXTUNNEL_NODE_BINARY at it, before Dextunnel Host starts the managed bridge.",
+                tailscaleInstalled: true,
+                tailscaleConnected: true,
+                tailscaleRemoteBaseURL: remoteBaseURL
             )
         }
 
@@ -300,12 +385,17 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             arguments: ["src/server.mjs"],
             environment: launchEnvironment,
             repoRootURL: repoRootURL,
-            baseURL: baseURL
+            baseURL: baseURL,
+            remoteBaseURL: remoteBaseURL,
+            tailscaleExecutableURL: resolvedTailscaleExecutable
         )
         return DextunnelLocalBridgeAvailability(
             command: command,
             issue: nil,
-            statusMessage: "Tailscale ready. Dextunnel Host can start the repo bridge at \(baseURL.absoluteString)."
+            statusMessage: "Tailscale ready. Dextunnel Host can run locally at \(baseURL.absoluteString) and share the remote at \(remoteBaseURL.absoluteString).",
+            tailscaleInstalled: true,
+            tailscaleConnected: true,
+            tailscaleRemoteBaseURL: remoteBaseURL
         )
     }
 
@@ -315,7 +405,9 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         compileTimeFilePath: String = #filePath,
         bundleResourceURL: URL? = Bundle.main.resourceURL,
         tailscaleInstalled: Bool? = nil,
-        tailscaleIPv4Address: String? = nil
+        tailscaleIPv4Address: String? = nil,
+        tailscaleDNSName: String? = nil,
+        tailscaleServeStatusData: Data? = nil
     ) -> DextunnelLocalBridgeCommand? {
         makeDefaultAvailability(
             environment: environment,
@@ -323,7 +415,9 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             compileTimeFilePath: compileTimeFilePath,
             bundleResourceURL: bundleResourceURL,
             tailscaleInstalled: tailscaleInstalled,
-            tailscaleIPv4Address: tailscaleIPv4Address
+            tailscaleIPv4Address: tailscaleIPv4Address,
+            tailscaleDNSName: tailscaleDNSName,
+            tailscaleServeStatusData: tailscaleServeStatusData
         ).command
     }
 
@@ -429,40 +523,32 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
         return nil
     }
 
-    static func defaultTailscaleIPv4Address(
+    static func defaultTailscaleStatus(
         executableURL: URL?,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         processFactory: () -> Process = Process.init
-    ) -> String? {
+    ) -> DextunnelTailscaleStatus? {
         guard let executableURL else {
             return nil
         }
 
-        let process = processFactory()
-        let pipe = Pipe()
-        process.executableURL = executableURL
-        process.arguments = ["ip", "-4"]
-        process.environment = environment
-        process.standardOutput = pipe
-        process.standardError = pipe
-
         do {
-            try process.run()
+            let data = try runCommand(
+                executableURL: executableURL,
+                arguments: ["status", "--json"],
+                environment: environment,
+                processFactory: processFactory
+            )
+            let payload = try JSONDecoder().decode(DextunnelTailscaleStatusPayload.self, from: data)
+            let ipv4Address = (payload.tailscaleIPs ?? payload.selfNode?.tailscaleIPs ?? [])
+                .first(where: { $0.contains(".") })
+            return DextunnelTailscaleStatus(
+                dnsName: payload.selfNode?.dnsName,
+                ipv4Address: ipv4Address
+            )
         } catch {
             return nil
         }
-
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            return nil
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let lines = String(decoding: data, as: UTF8.self)
-            .split(whereSeparator: \.isNewline)
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return lines.first
     }
 
     private static func mergedSearchPath(environment: [String: String]) -> String {
@@ -484,6 +570,8 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
 
     private static func embeddedBridgeCommand(
         baseURL: URL,
+        remoteBaseURL: URL,
+        tailscaleExecutableURL: URL,
         bundleResourceURL: URL?,
         environment: [String: String],
         fileManager: FileManager
@@ -505,8 +593,335 @@ public final class DextunnelLocalBridgeManager: DextunnelLocalBridgeManaging {
             arguments: ["src/server.mjs"],
             environment: environment,
             repoRootURL: bridgeRootURL,
-            baseURL: baseURL
+            baseURL: baseURL,
+            remoteBaseURL: remoteBaseURL,
+            tailscaleExecutableURL: tailscaleExecutableURL
         )
+    }
+
+    private func refreshAvailability() -> DextunnelLocalBridgeAvailability {
+        let refreshedAvailability = availabilityResolver()
+        availability = refreshedAvailability
+        return refreshedAvailability
+    }
+
+    private func runningStatusMessage(localBaseURL: URL, remoteBaseURL: URL?) -> String {
+        if let remoteBaseURL {
+            return "Dextunnel Host is running locally at \(localBaseURL.absoluteString) and shared on Tailscale at \(remoteBaseURL.absoluteString)."
+        }
+        return "Dextunnel Host is running locally at \(localBaseURL.absoluteString)."
+    }
+
+    private func ensureManagedServe(
+        localBaseURL: URL,
+        remoteBaseURL: URL?,
+        command: DextunnelLocalBridgeCommand
+    ) throws {
+        guard let remoteBaseURL else {
+            throw DextunnelLocalBridgeLaunchError.tailscaleAddressUnavailable
+        }
+        guard let localPort = localBaseURL.port else {
+            throw DextunnelLocalBridgeLaunchError.tailscaleServeConfigurationFailed(
+                "Dextunnel Host couldn't determine the Tailscale Serve port."
+            )
+        }
+        let remotePort = Self.servePort(for: remoteBaseURL)
+
+        let desiredAuthority = Self.serveAuthority(for: remoteBaseURL)
+        let desiredProxy = localBaseURL.absoluteString
+        var currentStatus = try Self.readServeStatus(
+            executableURL: command.tailscaleExecutableURL,
+            environment: command.environment,
+            processFactory: processFactory
+        )
+
+        let legacyAuthority = Self.legacyServeAuthority(for: remoteBaseURL, legacyPort: localPort)
+        if
+            legacyAuthority != desiredAuthority,
+            currentStatus.rootProxyByAuthority[legacyAuthority] == desiredProxy
+        {
+            do {
+                _ = try Self.runCommand(
+                    executableURL: command.tailscaleExecutableURL,
+                    arguments: ["serve", "--https=\(localPort)", "off"],
+                    environment: command.environment,
+                    processFactory: processFactory
+                )
+                currentStatus = try Self.readServeStatus(
+                    executableURL: command.tailscaleExecutableURL,
+                    environment: command.environment,
+                    processFactory: processFactory
+                )
+            } catch {
+                throw DextunnelLocalBridgeLaunchError.tailscaleServeConfigurationFailed(
+                    "Dextunnel Host couldn't replace the old Tailscale Serve port mapping: \(error.localizedDescription)"
+                )
+            }
+        }
+
+        if let existingProxy = currentStatus.rootProxyByAuthority[desiredAuthority] {
+            if existingProxy == desiredProxy {
+                return
+            }
+            throw DextunnelLocalBridgeLaunchError.tailscaleServeConflict(
+                "Tailscale Serve is already using \(remoteBaseURL.absoluteString) for another proxy."
+            )
+        }
+
+        if currentStatus.ports.contains(remotePort) {
+            throw DextunnelLocalBridgeLaunchError.tailscaleServeConflict(
+                "Tailscale Serve is already using port \(remotePort). Clear that config before starting Dextunnel Host."
+            )
+        }
+
+        do {
+            _ = try Self.runCommand(
+                executableURL: command.tailscaleExecutableURL,
+                arguments: ["serve", "--https=\(remotePort)", "--bg", "--yes", "\(localPort)"],
+                environment: command.environment,
+                processFactory: processFactory
+            )
+        } catch {
+            throw DextunnelLocalBridgeLaunchError.tailscaleServeConfigurationFailed(
+                "Dextunnel Host couldn't configure Tailscale Serve: \(error.localizedDescription)"
+            )
+        }
+
+        let updatedStatus = try Self.readServeStatus(
+            executableURL: command.tailscaleExecutableURL,
+            environment: command.environment,
+            processFactory: processFactory
+        )
+        guard updatedStatus.rootProxyByAuthority[desiredAuthority] == desiredProxy else {
+            throw DextunnelLocalBridgeLaunchError.tailscaleServeConfigurationFailed(
+                "Tailscale Serve did not publish \(remoteBaseURL.absoluteString) for Dextunnel Host."
+            )
+        }
+
+        if
+            legacyAuthority != desiredAuthority,
+            updatedStatus.rootProxyByAuthority[legacyAuthority] == desiredProxy
+        {
+            do {
+                _ = try Self.runCommand(
+                    executableURL: command.tailscaleExecutableURL,
+                    arguments: ["serve", "--https=\(localPort)", "off"],
+                    environment: command.environment,
+                    processFactory: processFactory
+                )
+            } catch {
+                throw DextunnelLocalBridgeLaunchError.tailscaleServeConfigurationFailed(
+                    "Dextunnel Host published the new Tailscale URL but couldn't remove the old port-based share: \(error.localizedDescription)"
+                )
+            }
+        }
+    }
+
+    private func stopManagedServeIfNeeded(command: DextunnelLocalBridgeCommand) throws {
+        let remotePort = Self.servePort(for: command.remoteBaseURL)
+        let desiredAuthority = Self.serveAuthority(for: command.remoteBaseURL)
+        let desiredProxy = command.baseURL.absoluteString
+        let currentStatus = try Self.readServeStatus(
+            executableURL: command.tailscaleExecutableURL,
+            environment: command.environment,
+            processFactory: processFactory
+        )
+        guard currentStatus.rootProxyByAuthority[desiredAuthority] == desiredProxy else {
+            return
+        }
+        _ = try Self.runCommand(
+            executableURL: command.tailscaleExecutableURL,
+            arguments: ["serve", "--https=\(remotePort)", "off"],
+            environment: command.environment,
+            processFactory: processFactory
+        )
+    }
+
+    private static func serveAuthority(for remoteBaseURL: URL) -> String {
+        let host = remoteBaseURL.host?.lowercased() ?? remoteBaseURL.absoluteString.lowercased()
+        if let port = remoteBaseURL.port {
+            return "\(host):\(port)"
+        }
+        if remoteBaseURL.scheme?.lowercased() == "https" {
+            return "\(host):443"
+        }
+        if remoteBaseURL.scheme?.lowercased() == "http" {
+            return "\(host):80"
+        }
+        return host
+    }
+
+    private static func legacyServeAuthority(for remoteBaseURL: URL, legacyPort: Int) -> String {
+        let host = remoteBaseURL.host?.lowercased() ?? remoteBaseURL.absoluteString.lowercased()
+        return "\(host):\(legacyPort)"
+    }
+
+    private static func servePort(for remoteBaseURL: URL) -> Int {
+        if let port = remoteBaseURL.port {
+            return port
+        }
+
+        switch remoteBaseURL.scheme?.lowercased() {
+        case "http":
+            return 80
+        default:
+            return 443
+        }
+    }
+
+    private static func preferredRemoteBaseURL(
+        dnsName: String,
+        localPort: Int,
+        existingServeStatus: DextunnelServeStatus?,
+        desiredProxy: String
+    ) -> URL {
+        let preferredPorts = [443, 8443, 9443]
+        let status = existingServeStatus
+
+        for port in preferredPorts {
+            let authority = authority(host: dnsName, port: port)
+            if status?.rootProxyByAuthority[authority] == desiredProxy {
+                return remoteBaseURL(host: dnsName, port: port)
+            }
+        }
+
+        for port in preferredPorts {
+            if status?.ports.contains(port) != true {
+                return remoteBaseURL(host: dnsName, port: port)
+            }
+        }
+
+        if let status {
+            let localAuthority = authority(host: dnsName, port: localPort)
+            if status.rootProxyByAuthority[localAuthority] == desiredProxy || !status.ports.contains(localPort) {
+                return remoteBaseURL(host: dnsName, port: localPort)
+            }
+        } else {
+            return remoteBaseURL(host: dnsName, port: 443)
+        }
+
+        return remoteBaseURL(host: dnsName, port: localPort)
+    }
+
+    private static func remoteBaseURL(host: String, port: Int) -> URL {
+        if port == 443 {
+            return URL(string: "https://\(host)")!
+        }
+        return URL(string: "https://\(host):\(port)")!
+    }
+
+    private static func authority(host: String, port: Int) -> String {
+        return "\(host.lowercased()):\(port)"
+    }
+
+    private static func readServeStatus(
+        executableURL: URL,
+        environment: [String: String],
+        processFactory: () -> Process
+    ) throws -> DextunnelServeStatus {
+        let data = try runCommand(
+            executableURL: executableURL,
+            arguments: ["serve", "status", "--json"],
+            environment: environment,
+            processFactory: processFactory
+        )
+        return try DextunnelServeStatus(data: data)
+    }
+
+    private static func runCommand(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String],
+        processFactory: () -> Process
+    ) throws -> Data {
+        let process = processFactory()
+        let pipe = Pipe()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.environment = environment
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard process.terminationStatus == 0 else {
+            let detail = String(decoding: data, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw DextunnelLocalBridgeLaunchError.failedToStart(
+                detail.isEmpty
+                    ? "Command failed: \(arguments.joined(separator: " "))"
+                    : detail
+            )
+        }
+        return data
+    }
+
+    private struct DextunnelTailscaleStatusPayload: Decodable {
+        let tailscaleIPs: [String]?
+        let selfNode: SelfNode?
+
+        enum CodingKeys: String, CodingKey {
+            case tailscaleIPs = "TailscaleIPs"
+            case selfNode = "Self"
+        }
+
+        struct SelfNode: Decodable {
+            let dnsName: String?
+            let tailscaleIPs: [String]?
+
+            enum CodingKeys: String, CodingKey {
+                case dnsName = "DNSName"
+                case tailscaleIPs = "TailscaleIPs"
+            }
+        }
+    }
+
+    private struct DextunnelServeStatus {
+        let ports: Set<Int>
+        let rootProxyByAuthority: [String: String]
+
+        init(data: Data) throws {
+            let object = try JSONSerialization.jsonObject(with: data, options: [])
+            let dictionary = object as? [String: Any] ?? [:]
+
+            var parsedPorts = Set<Int>()
+            if let tcp = dictionary["TCP"] as? [String: Any] {
+                for key in tcp.keys {
+                    if let port = Int(key) {
+                        parsedPorts.insert(port)
+                    }
+                }
+            }
+
+            var proxies: [String: String] = [:]
+            if let web = dictionary["Web"] as? [String: Any] {
+                for (authority, entryValue) in web {
+                    guard
+                        let entry = entryValue as? [String: Any],
+                        let handlers = entry["Handlers"] as? [String: Any],
+                        let rootEntry = handlers["/"] as? [String: Any],
+                        let proxy = rootEntry["Proxy"] as? String
+                    else {
+                        continue
+                    }
+                    let normalizedAuthority = authority.lowercased()
+                    proxies[normalizedAuthority] = proxy
+                    if let port = Self.port(forAuthority: normalizedAuthority) {
+                        parsedPorts.insert(port)
+                    } else {
+                        parsedPorts.insert(443)
+                    }
+                }
+            }
+
+            ports = parsedPorts
+            rootProxyByAuthority = proxies
+        }
+
+        private static func port(forAuthority authority: String) -> Int? {
+            URLComponents(string: "https://\(authority)")?.port
+        }
     }
 
     static func defaultEmbeddedBridgeRoot(

@@ -42,22 +42,22 @@
                     <span></span>
                   </span>
                 </button>
-                <div class="remote-hero-copy">
-                  <div class="terminal-statusline">
-                    <span id="remote-marquee" class="terminal-marquee">Initializing session bridge...</span>
-                  </div>
-                  <h1 id="remote-title">Connecting...</h1>
-                </div>
-              </div>
-              <div class="button-row toolbar-strip remote-top-actions" aria-label="Remote controls">
-                <button type="button" id="reply-toggle-button" class="command-button button-primary">Reply</button>
-                <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take control</button>
-                <button type="button" id="refresh-button" class="command-button command-button-compact">Refresh</button>
-              </div>
-            </div>
-            <p id="remote-target" class="terminal-subline">Waiting for a live Codex session.</p>
-            <p id="remote-scope-note" class="sync-note">Shared room: select a live Codex thread. Drafts and queue stay only on this remote.</p>
-          </section>
+	                <div class="remote-hero-copy">
+	                  <div class="terminal-statusline">
+	                    <span id="remote-marquee" class="terminal-marquee">Initializing session bridge...</span>
+	                  </div>
+	                  <h1 id="remote-title">Connecting...</h1>
+	                  <p id="remote-target" class="terminal-subline">Waiting for a live Codex session.</p>
+	                </div>
+	              </div>
+	              <div class="button-row toolbar-strip remote-top-actions" aria-label="Remote controls">
+	                <button type="button" id="reply-toggle-button" class="command-button button-primary">Reply</button>
+	                <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take control</button>
+	                <button type="button" id="refresh-button" class="command-button command-button-compact">Refresh</button>
+	              </div>
+	            </div>
+	            <p id="remote-scope-note" class="sync-note panel-hidden" hidden></p>
+	          </section>
 
           <section class="terminal-panel remote-status-panel panel-hidden" id="remote-status-panel" hidden>
             <div id="remote-operator-diagnostics" class="operator-diagnostics panel-hidden" hidden aria-live="polite"></div>
@@ -101,7 +101,7 @@
               </div>
               <span id="composer-target" class="inline-status">No live target</span>
             </div>
-            <p id="composer-scope-note" class="sync-note">Shared room: select a live Codex thread. Drafts and queue stay only on this remote.</p>
+            <p id="composer-scope-note" class="sync-note">Pick a thread first.</p>
             <form id="composer-form" class="stacked-form panel-hidden" hidden>
               <textarea id="reply-text" rows="3" placeholder="Append to the selected live Codex thread"></textarea>
               <div class="attachment-row">
@@ -140,22 +140,22 @@
               </div>
             </form>
             <p id="composer-status" class="composer-status">Ready</p>
-            <p id="composer-sync-note" class="sync-note">Desktop Codex can lag behind remote writes. Reveal in Codex navigates only.</p>
+            <p id="composer-sync-note" class="sync-note panel-hidden" hidden></p>
           </section>
 
-          <section class="terminal-panel remote-feed-panel">
-            <div class="section-head feed-head">
-              <div class="feed-tools">
-                <div class="filter-group" aria-label="Feed filters">
-                  <button type="button" class="filter-button is-active" data-filter="updates">Updates</button>
-                  <button type="button" class="filter-button is-active" data-filter="thread">Thread</button>
-                  <button type="button" class="filter-button is-active" data-filter="tools">Tools</button>
-                  <button type="button" class="filter-button is-active" data-filter="changes">Changes</button>
-                </div>
-                <button type="button" id="expand-all-button" class="command-button command-button-subtle command-button-compact">Expand all</button>
-              </div>
-            </div>
-            <div class="feed-list" id="remote-feed"></div>
+	          <section class="terminal-panel remote-feed-panel">
+	            <div class="section-head feed-head">
+	              <div class="feed-tools">
+	                <div class="filter-group" aria-label="Feed filters">
+	                  <button type="button" class="filter-button is-active" data-filter="updates">Updates</button>
+	                  <button type="button" class="filter-button is-active" data-filter="thread">Thread</button>
+	                  <button type="button" class="filter-button is-active" data-filter="tools">Tools</button>
+	                  <button type="button" class="filter-button is-active" data-filter="changes">Changes</button>
+	                </div>
+	                <button type="button" id="expand-all-button" class="command-button command-button-subtle command-button-compact">Expand all</button>
+	              </div>
+	            </div>
+	            <div class="feed-list" id="remote-feed"></div>
           </section>
         </section>
       </section>

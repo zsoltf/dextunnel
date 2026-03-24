@@ -33,6 +33,17 @@ test("surface access registry issues signed host and remote bootstrap tokens", (
   assert.equal(resolved.clientId, remote.clientId);
 });
 
+test("surface access registry issues an automation-friendly agent surface", () => {
+  const registry = createSurfaceAccessRegistry({ secret: "test-secret" });
+  const agent = registry.issueBootstrap("agent");
+
+  assert.equal(agent.surface, "agent");
+  assert.ok(agent.capabilities.includes("send_turn"));
+  assert.ok(agent.capabilities.includes("control_remote"));
+  assert.ok(!agent.capabilities.includes("use_companion"));
+  assert.ok(!agent.capabilities.includes("use_agent_room"));
+});
+
 test("surface access tokens expire after the configured ttl", () => {
   let nowMs = new Date("2026-03-19T00:00:00.000Z").getTime();
   const registry = createSurfaceAccessRegistry({
@@ -60,6 +71,19 @@ test("surface access tokens expire after the configured ttl", () => {
     }),
     null
   );
+});
+
+test("surface access registry accepts bearer auth as a first-class transport", () => {
+  const registry = createSurfaceAccessRegistry({ secret: "test-secret" });
+  const agent = registry.issueBootstrap("agent");
+  const resolved = registry.resolve({
+    headers: {
+      authorization: `Bearer ${agent.accessToken}`
+    }
+  });
+
+  assert.equal(resolved?.surface, "agent");
+  assert.equal(resolved?.clientId, agent.clientId);
 });
 
 test("surface access capability checks reject invalid or downgraded tokens", () => {

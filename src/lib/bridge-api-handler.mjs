@@ -101,6 +101,7 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
         if (
           !canServeSurfaceBootstrap({
             exposeHostSurface,
+            localAddress: req.socket?.localAddress || "",
             pathname,
             remoteAddress: req.socket?.remoteAddress || ""
           })
@@ -573,7 +574,7 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
           throw new Error("Resolve the pending interaction before sending another message.");
         }
 
-        if (access.surface === "remote" && targetThreadId) {
+        if (targetThreadId && access.capabilities.includes("control_remote")) {
           ensureRemoteControlLease(targetThreadId, access.surface, accessClientId(access));
         }
 

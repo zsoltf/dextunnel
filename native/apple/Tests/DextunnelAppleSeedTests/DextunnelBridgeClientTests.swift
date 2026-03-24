@@ -83,7 +83,7 @@ func bridgeClientDecodesThreadsResponse() async throws {
                 {
                   "channelLabel": "dextunnel",
                   "channelSlug": "#dextunnel",
-                  "cwd": "/Users/zsolt/dev/codex/dextunnel",
+                  "cwd": "/tmp/dextunnel-fixture",
                   "id": "thread-1",
                   "name": "dextunnel",
                   "openingPreview": "thread opener",
@@ -128,7 +128,7 @@ func bridgeClientDecodesCurrentThreadListShape() async throws {
                   "id": "thread-1",
                   "openingPreview": "first meaningful turn",
                   "preview": "hello",
-                  "cwd": "/Users/zsolt/dev/codex/dextunnel",
+                  "cwd": "/tmp/dextunnel-fixture",
                   "source": "vscode",
                   "name": "dextunnel",
                   "status": { "type": "idle" },
@@ -214,7 +214,7 @@ func bridgeClientDecodesLivePayloadTranscript() async throws {
                   "id": "thread-1",
                   "channelLabel": "dextunnel",
                   "channelSlug": "#dextunnel",
-                  "cwd": "/Users/zsolt/dev/codex/dextunnel",
+                  "cwd": "/tmp/dextunnel-fixture",
                   "name": "dextunnel",
                   "preview": "working on it",
                   "serverLabel": "codex/dextunnel",
@@ -232,7 +232,7 @@ func bridgeClientDecodesLivePayloadTranscript() async throws {
                 "source": "vscode",
                 "topic": "Native transcript test"
               },
-              "selectedProjectCwd": "/Users/zsolt/dev/codex/dextunnel",
+              "selectedProjectCwd": "/tmp/dextunnel-fixture",
               "selectedThreadId": "thread-1",
               "selectedThreadSnapshot": {
                 "channel": {
@@ -249,7 +249,7 @@ func bridgeClientDecodesLivePayloadTranscript() async throws {
                 ],
                 "thread": {
                   "activeTurnId": null,
-                  "cwd": "/Users/zsolt/dev/codex/dextunnel",
+                  "cwd": "/tmp/dextunnel-fixture",
                   "id": "thread-1",
                   "name": "dextunnel",
                   "source": "vscode",
@@ -331,7 +331,7 @@ func bridgeClientToleratesWatcherStyleTurnDiffWithoutItems() async throws {
                 "transcript": []
               },
               "turnDiff": {
-                "cwd": "/Users/zsolt/dev/codex/dextunnel",
+                "cwd": "/tmp/dextunnel-fixture",
                 "diff": "",
                 "threadId": "thread-1",
                 "turnId": "turn-1",
