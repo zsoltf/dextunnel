@@ -47,28 +47,6 @@ Then open [http://127.0.0.1:4317/](http://127.0.0.1:4317/).
 
 Use `npm run start:network` only if you intentionally want a manual LAN or broader-network listener.
 
-## Advanced Automation And Integration
-
-These discovery and API surfaces are meant for local automation, scripts, and advanced integrations.
-They are not the recommended first-use path for most people.
-
-If an agent or script finds the Dextunnel base URL, the low-friction entry points are:
-
-- `/.well-known/dextunnel.json` for the discovery manifest
-- `/openapi.json` for the HTTP schema
-- `/arazzo.json` for common multi-step workflows
-- `/llms.txt` for a lightweight summary
-- `/api/codex-app-server/bootstrap?surface=agent` for an automation-friendly access token
-
-Preferred auth for machine clients:
-
-- `Authorization: Bearer <accessToken>`
-
-Compatibility auth:
-
-- `x-dextunnel-surface-token: <accessToken>`
-- `surfaceToken=<accessToken>` query parameter, mainly for SSE or EventSource-style clients
-
 ## Today
 
 - browse real Codex threads through `app-server`
