@@ -125,6 +125,112 @@ export function createThreadSyncStateService({
     ].join("|");
   }
 
+  function normalizeThreadStatusValue(value = null) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function threadSnapshotExplicitlySettled(thread = {}) {
+    const settledStatuses = new Set(["completed", "failed", "cancelled", "canceled", "errored", "error", "stopped", "done"]);
+    if (thread?.activeTurnId || normalizeThreadStatusValue(thread?.activeTurnStatus) === "inprogress") {
+      return false;
+    }
+
+    return (
+      settledStatuses.has(normalizeThreadStatusValue(thread?.lastTurnStatus)) ||
+      settledStatuses.has(normalizeThreadStatusValue(thread?.status))
+    );
+  }
+
+  function mergeSelectedThreadMetadata(previousThread = {}, nextThread = {}) {
+    const previousThreadId = previousThread?.id || null;
+    const nextThreadId = nextThread?.id || null;
+    if (!previousThreadId || previousThreadId !== nextThreadId) {
+      return nextThread;
+    }
+
+    const settled = threadSnapshotExplicitlySettled(nextThread);
+    const merged = {
+      ...nextThread
+    };
+
+    for (const field of ["cwd", "lastTurnId", "lastTurnStatus", "livePlan", "name", "path", "preview", "source", "tokenUsage", "updatedAt"]) {
+      if (merged[field] == null && previousThread[field] != null) {
+        merged[field] = previousThread[field];
+      }
+    }
+
+    if (!settled) {
+      if (!merged.activeTurnId && previousThread.activeTurnId) {
+        merged.activeTurnId = previousThread.activeTurnId;
+      }
+      if (!merged.activeTurnStatus && previousThread.activeTurnStatus) {
+        merged.activeTurnStatus = previousThread.activeTurnStatus;
+      }
+      if (!merged.status && previousThread.status) {
+        merged.status = previousThread.status;
+      }
+    }
+
+    return merged;
+  }
+
+  function transcriptEntriesHavePrefixRelation(previousEntry = {}, nextEntry = {}) {
+    const previousText = normalizeTranscriptText(previousEntry?.text || "");
+    const nextText = normalizeTranscriptText(nextEntry?.text || "");
+    if (!previousText || !nextText) {
+      return false;
+    }
+
+    return previousText.startsWith(nextText) || nextText.startsWith(previousText);
+  }
+
+  function transcriptTimestampsNear(previousTimestamp = null, nextTimestamp = null, windowMs = 15_000) {
+    const previousMs = new Date(previousTimestamp || 0).getTime();
+    const nextMs = new Date(nextTimestamp || 0).getTime();
+    if (!Number.isFinite(previousMs) || previousMs <= 0 || !Number.isFinite(nextMs) || nextMs <= 0) {
+      return false;
+    }
+
+    return Math.abs(previousMs - nextMs) <= windowMs;
+  }
+
+  function transcriptEntriesShouldCoalesce(previousEntry = {}, nextEntry = {}) {
+    if (
+      (previousEntry?.role || "") !== (nextEntry?.role || "") ||
+      (previousEntry?.kind || "") !== (nextEntry?.kind || "")
+    ) {
+      return false;
+    }
+
+    if (!transcriptEntriesHavePrefixRelation(previousEntry, nextEntry)) {
+      return false;
+    }
+
+    const oneSideHasItemId = Boolean(previousEntry?.itemId) !== Boolean(nextEntry?.itemId);
+    if (!oneSideHasItemId) {
+      return false;
+    }
+
+    return transcriptTimestampsNear(previousEntry?.timestamp || null, nextEntry?.timestamp || null);
+  }
+
+  function mergeTranscriptEntries(previousEntry = {}, nextEntry = {}) {
+    const previousText = normalizeTranscriptText(previousEntry?.text || "");
+    const nextText = normalizeTranscriptText(nextEntry?.text || "");
+    const preferNextText = nextText.length > previousText.length;
+
+    return {
+      ...previousEntry,
+      ...nextEntry,
+      itemId: previousEntry?.itemId || nextEntry?.itemId || null,
+      turnId: previousEntry?.turnId || nextEntry?.turnId || null,
+      text: preferNextText ? (nextEntry?.text ?? previousEntry?.text ?? "") : (previousEntry?.text ?? nextEntry?.text ?? ""),
+      timestamp: preferNextText
+        ? (nextEntry?.timestamp || previousEntry?.timestamp || null)
+        : (previousEntry?.timestamp || nextEntry?.timestamp || null)
+    };
+  }
+
   function mergeSelectedThreadSnapshot(previousSnapshot, nextSnapshot) {
     const previousThreadId = previousSnapshot?.thread?.id || null;
     const nextThreadId = nextSnapshot?.thread?.id || null;
@@ -134,34 +240,27 @@ export function createThreadSyncStateService({
 
     const previousTranscript = Array.isArray(previousSnapshot?.transcript) ? previousSnapshot.transcript : [];
     const nextTranscript = Array.isArray(nextSnapshot?.transcript) ? nextSnapshot.transcript : [];
-    if (previousTranscript.length === 0 || nextTranscript.length === 0) {
-      return nextSnapshot;
-    }
-
     const merged = [];
-    const seenIdentityKeys = new Set();
-    const seenSemanticKeys = new Set();
     for (const entry of [...previousTranscript, ...nextTranscript]) {
       const identityKey = transcriptEntryMergeKey(entry);
       const semanticKey = transcriptEntrySemanticKey(entry);
-      if (
-        (identityKey && seenIdentityKeys.has(identityKey)) ||
-        (semanticKey && seenSemanticKeys.has(semanticKey))
-      ) {
+      const mergeIndex = merged.findIndex((existingEntry) => (
+        (identityKey && identityKey === transcriptEntryMergeKey(existingEntry)) ||
+        (semanticKey && semanticKey === transcriptEntrySemanticKey(existingEntry)) ||
+        transcriptEntriesShouldCoalesce(existingEntry, entry)
+      ));
+
+      if (mergeIndex >= 0) {
+        merged[mergeIndex] = mergeTranscriptEntries(merged[mergeIndex], entry);
         continue;
       }
 
-      if (identityKey) {
-        seenIdentityKeys.add(identityKey);
-      }
-      if (semanticKey) {
-        seenSemanticKeys.add(semanticKey);
-      }
       merged.push(entry);
     }
 
     return {
       ...nextSnapshot,
+      thread: mergeSelectedThreadMetadata(previousSnapshot?.thread || {}, nextSnapshot?.thread || {}),
       transcript: merged.slice(-preservedTranscriptLimit),
       transcriptCount: Math.max(
         Number.isFinite(previousSnapshot?.transcriptCount) ? previousSnapshot.transcriptCount : previousTranscript.length,

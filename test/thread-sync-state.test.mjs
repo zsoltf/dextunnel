@@ -654,6 +654,151 @@ test("refreshSelectedThreadSnapshot dedupes the same turn when live items and se
   );
 });
 
+test("refreshSelectedThreadSnapshot preserves richer live in-progress state when a lightweight refresh is thinner", async () => {
+  const { liveState, service } = createService({
+    liveState: {
+      lastError: null,
+      lastSyncAt: null,
+      selectedProjectCwd: "/tmp/codex/dextunnel",
+      selectedThreadId: "thr_dextunnel",
+      selectedThreadSnapshot: {
+        thread: {
+          id: "thr_dextunnel",
+          name: "dextunnel",
+          cwd: "/tmp/codex/dextunnel",
+          activeTurnId: "turn_live",
+          activeTurnStatus: "inProgress",
+          lastTurnId: "turn_live",
+          lastTurnStatus: "inProgress",
+          status: "inProgress"
+        },
+        transcript: [
+          {
+            itemId: "item_agent_live",
+            kind: "message",
+            role: "assistant",
+            text: "The code path is stable and the runtime kernel is already in place.",
+            timestamp: "2026-03-24T16:25:00.100Z",
+            turnId: "turn_live"
+          }
+        ],
+        transcriptCount: 1
+      },
+      selectionSource: "remote",
+      threads: [{ id: "thr_dextunnel", name: "dextunnel", cwd: "/tmp/codex/dextunnel" }],
+      turnDiff: null
+    },
+    readSelectedThread: async (threadId) => ({
+      cwd: "/tmp/codex/dextunnel",
+      id: threadId,
+      name: "dextunnel",
+      path: "/tmp/thread.jsonl"
+    }),
+    buildLightweightSelectedThreadSnapshot: async () => ({
+      thread: {
+        id: "thr_dextunnel",
+        name: "dextunnel",
+        cwd: "/tmp/codex/dextunnel",
+        activeTurnId: null,
+        activeTurnStatus: null,
+        lastTurnId: "turn_live",
+        lastTurnStatus: "inProgress",
+        status: "inProgress"
+      },
+      transcript: [
+        {
+          kind: "message",
+          role: "assistant",
+          text: "The",
+          timestamp: "2026-03-24T16:25:00.900Z"
+        }
+      ],
+      transcriptCount: 1
+    }),
+    snapshotNeedsDeepHydration: () => false
+  });
+
+  await service.refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+
+  assert.equal(liveState.selectedThreadSnapshot.thread.activeTurnId, "turn_live");
+  assert.equal(liveState.selectedThreadSnapshot.thread.activeTurnStatus, "inProgress");
+  assert.deepEqual(
+    liveState.selectedThreadSnapshot.transcript.map((entry) => entry.text),
+    ["The code path is stable and the runtime kernel is already in place."]
+  );
+});
+
+test("refreshSelectedThreadSnapshot lets a lightweight refresh clear active turn state when completion is explicit", async () => {
+  const { liveState, service } = createService({
+    liveState: {
+      lastError: null,
+      lastSyncAt: null,
+      selectedProjectCwd: "/tmp/codex/dextunnel",
+      selectedThreadId: "thr_dextunnel",
+      selectedThreadSnapshot: {
+        thread: {
+          id: "thr_dextunnel",
+          name: "dextunnel",
+          cwd: "/tmp/codex/dextunnel",
+          activeTurnId: "turn_live",
+          activeTurnStatus: "inProgress",
+          lastTurnId: "turn_live",
+          lastTurnStatus: "inProgress",
+          status: "inProgress"
+        },
+        transcript: [
+          {
+            itemId: "item_agent_live",
+            kind: "message",
+            role: "assistant",
+            text: "The code path is stable and the runtime kernel is already in place.",
+            timestamp: "2026-03-24T16:25:00.100Z",
+            turnId: "turn_live"
+          }
+        ],
+        transcriptCount: 1
+      },
+      selectionSource: "remote",
+      threads: [{ id: "thr_dextunnel", name: "dextunnel", cwd: "/tmp/codex/dextunnel" }],
+      turnDiff: null
+    },
+    readSelectedThread: async (threadId) => ({
+      cwd: "/tmp/codex/dextunnel",
+      id: threadId,
+      name: "dextunnel",
+      path: "/tmp/thread.jsonl"
+    }),
+    buildLightweightSelectedThreadSnapshot: async () => ({
+      thread: {
+        id: "thr_dextunnel",
+        name: "dextunnel",
+        cwd: "/tmp/codex/dextunnel",
+        activeTurnId: null,
+        activeTurnStatus: null,
+        lastTurnId: "turn_live",
+        lastTurnStatus: "completed",
+        status: "completed"
+      },
+      transcript: [
+        {
+          kind: "message",
+          role: "assistant",
+          text: "Completed with evidence.",
+          timestamp: "2026-03-24T16:25:02.000Z"
+        }
+      ],
+      transcriptCount: 1
+    }),
+    snapshotNeedsDeepHydration: () => false
+  });
+
+  await service.refreshSelectedThreadSnapshot({ broadcastUpdate: false });
+
+  assert.equal(liveState.selectedThreadSnapshot.thread.activeTurnId, null);
+  assert.equal(liveState.selectedThreadSnapshot.thread.activeTurnStatus, null);
+  assert.equal(liveState.selectedThreadSnapshot.thread.lastTurnStatus, "completed");
+});
+
 test("refreshSelectedThreadSnapshot clears snapshot and diff when nothing is selected", async () => {
   const { calls, liveState, service } = createService({
     liveState: {
