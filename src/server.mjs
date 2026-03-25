@@ -1039,7 +1039,15 @@ async function buildSelectedThreadSnapshotFromLog(thread, { limit = SELECTED_TRA
     return snapshot;
   }
 
-  const fullThread = await codexAppServer.readThread(thread.id, true);
+  let fullThread = null;
+  try {
+    fullThread = await codexAppServer.readThread(thread.id, true);
+  } catch (error) {
+    if (String(error?.message || "").includes("not materialized yet")) {
+      return snapshot;
+    }
+    throw error;
+  }
   if (!fullThread) {
     return snapshot;
   }

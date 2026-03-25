@@ -22,6 +22,7 @@ export function createWatcherLifecycleService({
   clearTimeoutFn = clearTimeout
 } = {}) {
   let snapshotRefreshTimer = null;
+  let snapshotSettleRefreshTimer = null;
   let watchReconnectTimer = null;
   let watcherController = null;
   let watcherToken = 0;
@@ -41,6 +42,11 @@ export function createWatcherLifecycleService({
     if (watchReconnectTimer) {
       clearTimeoutFn(watchReconnectTimer);
       watchReconnectTimer = null;
+    }
+
+    if (snapshotSettleRefreshTimer) {
+      clearTimeoutFn(snapshotSettleRefreshTimer);
+      snapshotSettleRefreshTimer = null;
     }
 
     if (watcherController) {
@@ -63,6 +69,17 @@ export function createWatcherLifecycleService({
 
       void restartWatcher();
     }, 1200);
+  }
+
+  function scheduleSnapshotSettleRefresh(delay = 1400) {
+    if (snapshotSettleRefreshTimer) {
+      clearTimeoutFn(snapshotSettleRefreshTimer);
+    }
+
+    snapshotSettleRefreshTimer = setTimeoutFn(() => {
+      snapshotSettleRefreshTimer = null;
+      void refreshSelectedThreadSnapshot();
+    }, delay);
   }
 
   function handleServerRequest(request) {
@@ -148,6 +165,7 @@ export function createWatcherLifecycleService({
     });
     broadcast("live", buildLivePayload());
     scheduleSnapshotRefresh(80);
+    scheduleSnapshotSettleRefresh(1400);
   }
 
   function handleTurnDiffUpdated(message, threadId, cwd) {

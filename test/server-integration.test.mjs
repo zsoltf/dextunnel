@@ -764,6 +764,80 @@ test("server integration locks the live turn route until the send settles", asyn
   }
 });
 
+test("server integration can create a fresh thread, claim it, send the first turn, and read it back", async () => {
+  const server = await startTestServer();
+
+  try {
+    const initial = await requestSurfaceJson(server, "remote", "/api/codex-app-server/live-state");
+    const previousThreadId = initial.payload.selectedThreadId;
+
+    const created = await requestSurfaceJson(server, "remote", "/api/codex-app-server/thread", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        cwd: "/tmp/codex/fresh-thread"
+      })
+    });
+
+    assert.equal(created.ok, true);
+    const freshThreadId = created.payload.state.selectedThreadId;
+    assert.ok(freshThreadId);
+    assert.notEqual(freshThreadId, previousThreadId);
+    assert.equal(created.payload.state.selectedThreadSnapshot.thread.id, freshThreadId);
+    assert.equal(created.payload.state.selectedThreadSnapshot.transcriptCount, 0);
+
+    const claim = await requestSurfaceJson(server, "remote", "/api/codex-app-server/control", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "claim",
+        threadId: freshThreadId
+      })
+    });
+    assert.equal(claim.ok, true);
+
+    const send = await requestSurfaceJson(server, "remote", "/api/codex-app-server/turn", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        text: "Fresh thread integration send",
+        threadId: freshThreadId
+      })
+    });
+    assert.equal(send.ok, true);
+    assert.equal(send.payload.thread.id, freshThreadId);
+
+    const threadRead = await requestSurfaceJson(
+      server,
+      "remote",
+      `/api/codex-app-server/thread?threadId=${encodeURIComponent(freshThreadId)}&limit=40`
+    );
+    assert.equal(threadRead.ok, true);
+    assert.equal(threadRead.payload.found, true);
+    assert.equal(threadRead.payload.snapshot.thread.id, freshThreadId);
+    assert.equal(
+      threadRead.payload.snapshot.transcript.some(
+        (entry) => entry.role === "user" && entry.text.includes("Fresh thread integration send")
+      ),
+      true
+    );
+    assert.equal(
+      threadRead.payload.snapshot.transcript.some(
+        (entry) => entry.role === "assistant" && entry.text.includes("FAKE_BRIDGE_ACK")
+      ),
+      true
+    );
+  } finally {
+    await server.close();
+  }
+});
+
 test("server integration rejects a send from the wrong remote surface while another remote owns control", async () => {
   const server = await startTestServer();
 

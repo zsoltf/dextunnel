@@ -6,6 +6,7 @@ import path from "node:path";
 
 import {
   buildSessionLogSnapshot,
+  createCodexAppServerBridge,
   getWritableTurnStrategy,
   mapThreadToCompanionSnapshot,
   pageTranscriptEntries,
@@ -234,6 +235,99 @@ test("readTranscriptHistoryPageFromSessionLog pages older transcript entries by 
   assert.deepEqual(secondOlderPage.items.map((entry) => entry.text), ["one"]);
   assert.equal(secondOlderPage.nextBeforeIndex, null);
   assert.equal(secondOlderPage.hasMore, false);
+});
+
+test("runTurnSession falls back to direct turn start when thread resume reports no rollout", async () => {
+  const sentMessages = [];
+
+  class FakeWebSocket {
+    constructor() {
+      this.listeners = new Map();
+      queueMicrotask(() => this.emit("open", {}));
+    }
+
+    addEventListener(event, handler) {
+      const handlers = this.listeners.get(event) || [];
+      handlers.push(handler);
+      this.listeners.set(event, handlers);
+    }
+
+    close() {}
+
+    emit(event, payload) {
+      for (const handler of this.listeners.get(event) || []) {
+        handler(payload);
+      }
+    }
+
+    send(raw) {
+      const message = JSON.parse(raw);
+      sentMessages.push(message);
+
+      if (message.method === "initialize") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {}
+          })
+        }));
+        return;
+      }
+
+      if (message.method === "initialized") {
+        return;
+      }
+
+      if (message.method === "thread/resume") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            error: {
+              message: "no rollout found for thread id thr_new"
+            }
+          })
+        }));
+        return;
+      }
+
+      if (message.method === "turn/start") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              turn: {
+                id: "turn_1",
+                status: "inProgress"
+              }
+            }
+          })
+        }));
+      }
+    }
+  }
+
+  const bridge = createCodexAppServerBridge({
+    fetchImpl: async () => ({ ok: true }),
+    WebSocketImpl: FakeWebSocket
+  });
+
+  const session = await bridge.runTurnSession({
+    threadId: "thr_new",
+    cwd: "/tmp/codex/new",
+    text: "hello",
+    createThreadIfMissing: false,
+    timeoutMs: 1000,
+    waitForAcceptanceOnly: true
+  });
+
+  assert.equal(session.mode, "start");
+  assert.equal(session.thread.id, "thr_new");
+  assert.equal(session.turn.id, "turn_1");
+  assert.ok(sentMessages.some((entry) => entry.method === "thread/resume"));
+  assert.ok(sentMessages.some((entry) => entry.method === "turn/start"));
 });
 
 test("pageTranscriptEntries keeps a stable cursor across an in-memory transcript", () => {

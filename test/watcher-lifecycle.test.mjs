@@ -191,6 +191,8 @@ test("watcher lifecycle applies live turn notifications and refresh fallbacks", 
   });
   assert.equal(liveState.writeLock, null);
   assert.ok(calls.some((entry) => entry[0] === "wakeTurnCompletion"));
+  assert.ok(timers.scheduled().some((timer) => timer.delay === 80));
+  assert.ok(timers.scheduled().some((timer) => timer.delay === 1400));
 });
 
 test("watcher lifecycle maps server requests and resolves them cleanly", async () => {

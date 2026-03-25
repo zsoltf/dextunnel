@@ -121,6 +121,45 @@ test("refreshThreads uses lightweight summaries so previews reflect latest room 
   assert.equal(liveState.threads[1].preview, "nix latest update");
 });
 
+test("refreshThreads preserves the currently selected fresh thread when the room list has not caught up yet", async () => {
+  const { liveState, service } = createService({
+    codexAppServer: {
+      listThreads: async () => [
+        { id: "thr_old", name: "older room", cwd: "/tmp/codex/old" }
+      ],
+      readThread: async () => null,
+      startThread: async () => ({ id: "thr_new" })
+    },
+    liveState: {
+      lastError: null,
+      selectedProjectCwd: "/tmp/codex/new-thread",
+      selectedThreadId: "thr_new",
+      selectedThreadSnapshot: {
+        thread: {
+          id: "thr_new",
+          name: "fresh room",
+          cwd: "/tmp/codex/new-thread",
+          lastTurnStatus: "inProgress"
+        },
+        transcript: [],
+        transcriptCount: 0
+      },
+      selectionSource: "remote",
+      threads: [
+        { id: "thr_new", name: "fresh room", cwd: "/tmp/codex/new-thread" },
+        { id: "thr_old", name: "older room", cwd: "/tmp/codex/old" }
+      ],
+      turnDiff: null
+    }
+  });
+
+  await service.refreshThreads({ broadcastUpdate: false });
+
+  assert.equal(liveState.selectedThreadId, "thr_new");
+  assert.equal(liveState.threads[0].id, "thr_new");
+  assert.equal(liveState.threads[1].id, "thr_old");
+});
+
 test("refreshSelectedThreadSnapshot can use a lightweight selected-thread reader and snapshot builder", async () => {
   const readRequests = [];
   const { calls, liveState, service } = createService({
@@ -175,6 +214,90 @@ test("refreshSelectedThreadSnapshot can use a lightweight selected-thread reader
   assert.deepEqual(readRequests, []);
   assert.deepEqual(calls, [["loadAgentRoom", "thr_dextunnel"]]);
   assert.equal(liveState.selectedThreadSnapshot.transcript[0].text, "latest assistant reply");
+  assert.equal(liveState.lastError, null);
+});
+
+test("createThreadSelectionState uses a lightweight snapshot for a brand-new empty thread", async () => {
+  const readRequests = [];
+  const createdThread = {
+    cwd: "/tmp/codex/new",
+    id: "thr_new",
+    name: "New session",
+    path: "/tmp/codex/new/.codex/thr_new.jsonl",
+    preview: null,
+    turns: []
+  };
+  const { liveState, service } = createService({
+    codexAppServer: {
+      listThreads: async () => [],
+      readThread: async (threadId, includeTurns) => {
+        readRequests.push([threadId, includeTurns]);
+        assert.equal(includeTurns, false);
+        return createdThread;
+      },
+      startThread: async () => createdThread
+    },
+    buildLightweightSelectedThreadSnapshot: async (thread, { limit }) => ({
+      thread: {
+        cwd: thread.cwd,
+        id: thread.id,
+        name: thread.name
+      },
+      transcript: [],
+      transcriptCount: 0
+    }),
+    snapshotNeedsDeepHydration: () => true
+  });
+
+  const result = await service.createThreadSelectionState({
+    cwd: "/tmp/codex/new",
+    source: "remote"
+  });
+
+  assert.deepEqual(readRequests, [["thr_new", false]]);
+  assert.equal(result.thread.id, "thr_new");
+  assert.equal(result.snapshot.thread.id, "thr_new");
+  assert.equal(result.snapshot.transcriptHydrating, false);
+  assert.equal(liveState.selectedThreadSnapshot.thread.id, "thr_new");
+  assert.equal(liveState.selectedThreadSnapshot.transcriptHydrating, false);
+});
+
+test("createThreadSelectionState falls back to the started thread when a new thread is not materialized yet", async () => {
+  const createdThread = {
+    cwd: "/tmp/codex/new",
+    id: "thr_new",
+    name: "New session",
+    path: "/tmp/codex/new/.codex/thr_new.jsonl",
+    preview: null,
+    turns: []
+  };
+  const { liveState, service } = createService({
+    codexAppServer: {
+      listThreads: async () => [],
+      readThread: async () => {
+        throw new Error("thread thr_new is not materialized yet; includeTurns is unavailable before first user message");
+      },
+      startThread: async () => createdThread
+    },
+    buildLightweightSelectedThreadSnapshot: async (thread) => ({
+      thread: {
+        cwd: thread.cwd,
+        id: thread.id,
+        name: thread.name
+      },
+      transcript: [],
+      transcriptCount: 0
+    })
+  });
+
+  const result = await service.createThreadSelectionState({
+    cwd: "/tmp/codex/new",
+    source: "remote"
+  });
+
+  assert.equal(result.thread.id, "thr_new");
+  assert.equal(liveState.selectedThreadId, "thr_new");
+  assert.equal(liveState.selectedThreadSnapshot.thread.id, "thr_new");
   assert.equal(liveState.lastError, null);
 });
 

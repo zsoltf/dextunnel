@@ -188,6 +188,37 @@ export function createThreadSyncStateService({
     };
   }
 
+  async function readFreshThreadForSelection(createdThread) {
+    if (!createdThread?.id) {
+      return createdThread;
+    }
+
+    try {
+      const readableThread = await codexAppServer.readThread(createdThread.id, false);
+      return readableThread || createdThread;
+    } catch (error) {
+      if (!String(error?.message || "").includes("not materialized yet")) {
+        throw error;
+      }
+
+      return createdThread;
+    }
+  }
+
+  function createdThreadNeedsDeepHydration(snapshot, {
+    limit = selectedTranscriptLimit,
+    thread = null
+  } = {}) {
+    if (!Array.isArray(thread?.turns) || thread.turns.length === 0) {
+      return false;
+    }
+
+    return snapshotNeedsDeepHydration(snapshot, {
+      limit,
+      thread
+    });
+  }
+
   async function refreshThreadSummary(thread) {
     if (!thread) {
       return;
@@ -276,6 +307,26 @@ export function createThreadSyncStateService({
     if (liveState.selectedThreadId !== previousThreadId) {
       clearControlLease({ broadcastUpdate: false });
     }
+  }
+
+  function preserveSelectedThreadSummary(threads = []) {
+    const selectedThreadId = String(liveState.selectedThreadId || "").trim();
+    const selectedSnapshotThread = liveState.selectedThreadSnapshot?.thread || null;
+    if (!selectedThreadId || selectedSnapshotThread?.id !== selectedThreadId) {
+      return threads;
+    }
+
+    if ((threads || []).some((thread) => thread?.id === selectedThreadId)) {
+      return threads;
+    }
+
+    return [
+      summarizeThread({
+        ...selectedSnapshotThread,
+        id: selectedThreadId
+      }),
+      ...(Array.isArray(threads) ? threads : [])
+    ];
   }
 
   async function hydrateThreadSummaries(threads = []) {
@@ -398,7 +449,7 @@ export function createThreadSyncStateService({
         });
       }
 
-      liveState.threads = await hydrateThreadSummaries(threads);
+      liveState.threads = preserveSelectedThreadSummary(await hydrateThreadSummaries(threads));
       maybePickFallbackSelection();
       liveState.lastError = null;
     } catch (error) {
@@ -502,8 +553,17 @@ export function createThreadSyncStateService({
       ephemeral: false,
       persistExtendedHistory: true
     });
-    const hydratedThread = await codexAppServer.readThread(createdThread.id, true);
-    const snapshot = mapThreadToCompanionSnapshot(hydratedThread, { limit: selectedTranscriptLimit });
+    const hydratedThread = await readFreshThreadForSelection(createdThread);
+    const snapshotBase = buildQuickSelectedThreadSnapshot
+      ? await buildQuickSelectedThreadSnapshot(hydratedThread, {
+          limit: selectedTranscriptLimit
+        })
+      : mapThreadToCompanionSnapshot(hydratedThread, { limit: selectedTranscriptLimit });
+    const needsDeepHydration = createdThreadNeedsDeepHydration(snapshotBase, {
+      limit: selectedTranscriptLimit,
+      thread: hydratedThread
+    });
+    const snapshot = setSelectedSnapshotHydrationState(snapshotBase, needsDeepHydration);
 
     liveState.selectionSource = source;
     liveState.selectedProjectCwd = hydratedThread.cwd || targetCwd;
@@ -517,6 +577,10 @@ export function createThreadSyncStateService({
       summarizeThread(hydratedThread),
       ...liveState.threads.filter((thread) => thread.id !== hydratedThread.id)
     ];
+
+    if (needsDeepHydration) {
+      hydrateSelectedThreadSnapshotInBackground(hydratedThread, hydratedThread.id);
+    }
 
     return {
       snapshot,

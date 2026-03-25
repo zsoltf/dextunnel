@@ -92,6 +92,22 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
     };
   }
 
+  function mergeSelectedReadbackSnapshot(threadId, snapshot) {
+    const selectedSnapshot = liveState.selectedThreadSnapshot;
+    if (!threadId || !snapshot) {
+      return snapshot;
+    }
+
+    if (
+      liveState.selectedThreadId !== threadId ||
+      selectedSnapshot?.thread?.id !== threadId
+    ) {
+      return snapshot;
+    }
+
+    return mergeSelectedThreadSnapshot(snapshot, selectedSnapshot);
+  }
+
   try {
     if (req.method === "GET" && url.pathname === "/api/codex-app-server/bootstrap") {
       const surface = String(url.searchParams.get("surface") || "remote").trim().toLowerCase();
@@ -491,9 +507,12 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
         const thread = await codexAppServer.readThread(threadId, false);
         const snapshot = thread
           ? decorateSnapshot(
-              await buildSelectedThreadSnapshot(thread, {
-                limit: normalizedLimit
-              })
+              mergeSelectedReadbackSnapshot(
+                threadId,
+                await buildSelectedThreadSnapshot(thread, {
+                  limit: normalizedLimit
+                })
+              )
             )
           : null;
 

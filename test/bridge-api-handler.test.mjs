@@ -261,6 +261,164 @@ test("bridge api handler derives selection authority from the signed surface acc
   ]);
 });
 
+test("bridge api handler creates a fresh thread selection with the signed surface access", async () => {
+  const sent = [];
+  const calls = [];
+  const handled = await handleBridgeApiRequest({
+    req: { headers: {}, method: "POST" },
+    res: {},
+    url: new URL("http://localhost/api/codex-app-server/thread"),
+    deps: createDeps({
+      readJsonBody: async () => ({
+        clientId: "spoofed-body-client",
+        cwd: "/tmp/codex/new-thread"
+      }),
+      requireSurfaceCapability: () => ({
+        capabilities: ["select_room"],
+        clientId: "signed-remote-client",
+        surface: "remote"
+      }),
+      createThreadSelection: async (payload) => {
+        calls.push(payload);
+        return {
+          ok: true,
+          source: payload.source,
+          state: {
+            selectedThreadId: "thr_new"
+          },
+          thread: {
+            id: "thr_new",
+            cwd: payload.cwd
+          }
+        };
+      },
+      sendJson: (_res, statusCode, payload) => {
+        sent.push({ payload, statusCode });
+      }
+    })
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(calls, [
+    {
+      clientId: "signed-remote-client",
+      cwd: "/tmp/codex/new-thread",
+      source: "remote"
+    }
+  ]);
+  assert.deepEqual(sent, [
+    {
+      payload: {
+        ok: true,
+        source: "remote",
+        state: {
+          selectedThreadId: "thr_new"
+        },
+        thread: {
+          id: "thr_new",
+          cwd: "/tmp/codex/new-thread"
+        }
+      },
+      statusCode: 200
+    }
+  ]);
+});
+
+test("bridge api handler prefers the richer selected live snapshot on thread readback", async () => {
+  const sent = [];
+  const lightweightThread = {
+    id: "thr_fresh",
+    cwd: "/tmp/codex/new-thread",
+    turns: []
+  };
+  const lightweightSnapshot = {
+    thread: {
+      id: "thr_fresh",
+      cwd: "/tmp/codex/new-thread",
+      activeTurnStatus: null,
+      lastTurnStatus: null
+    },
+    transcript: [
+      { role: "user", text: "Fresh thread integration send" }
+    ],
+    transcriptCount: 1
+  };
+  const richerSelectedSnapshot = {
+    thread: {
+      id: "thr_fresh",
+      cwd: "/tmp/codex/new-thread",
+      activeTurnStatus: "inProgress",
+      lastTurnStatus: "inProgress"
+    },
+    transcript: [
+      { role: "user", text: "Fresh thread integration send" },
+      { role: "assistant", text: "Thinking..." }
+    ],
+    transcriptCount: 2
+  };
+
+  const handled = await handleBridgeApiRequest({
+    req: { headers: {}, method: "GET" },
+    res: {},
+    url: new URL("http://localhost/api/codex-app-server/thread?threadId=thr_fresh&limit=40"),
+    deps: createDeps({
+      buildSelectedThreadSnapshot: async () => lightweightSnapshot,
+      codexAppServer: {
+        readThread: async (threadId, includeTurns) => {
+          assert.equal(threadId, "thr_fresh");
+          assert.equal(includeTurns, false);
+          return lightweightThread;
+        }
+      },
+      liveState: {
+        pendingInteraction: null,
+        selectedProjectCwd: "/tmp/codex/new-thread",
+        selectedThreadId: "thr_fresh",
+        selectedThreadSnapshot: richerSelectedSnapshot,
+        surfacePresenceByClientId: {},
+        threads: [],
+        turnDiff: null,
+        writeLock: null
+      },
+      mergeSelectedThreadSnapshot: (snapshot, selectedSnapshot) => ({
+        ...selectedSnapshot,
+        transcript: [
+          ...(snapshot?.transcript || []),
+          ...((selectedSnapshot?.transcript || []).slice(snapshot?.transcript?.length || 0))
+        ],
+        transcriptCount: Math.max(snapshot?.transcriptCount || 0, selectedSnapshot?.transcriptCount || 0)
+      }),
+      sendJson: (_res, statusCode, payload) => {
+        sent.push({ payload, statusCode });
+      }
+    })
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(sent, [
+    {
+      payload: {
+        threadId: "thr_fresh",
+        found: true,
+        snapshot: {
+          thread: {
+            id: "thr_fresh",
+            cwd: "/tmp/codex/new-thread",
+            activeTurnStatus: "inProgress",
+            lastTurnStatus: "inProgress"
+          },
+          transcript: [
+            { role: "user", text: "Fresh thread integration send" },
+            { role: "assistant", text: "Thinking..." }
+          ],
+          transcriptCount: 2
+        }
+      },
+      statusCode: 200
+    }
+  ]);
+});
+
 test("bridge api handler serves transcript history for the selected thread", async () => {
   const sent = [];
   const handled = await handleBridgeApiRequest({

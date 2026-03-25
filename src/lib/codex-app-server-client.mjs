@@ -10,6 +10,10 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isNoRolloutFoundError(message = "") {
+  return /no rollout found for thread id/i.test(String(message || ""));
+}
+
 function sendInitializedNotification(socket) {
   socket.send(
     JSON.stringify({
@@ -631,7 +635,10 @@ export function getWritableTurnStrategy(thread) {
 export function createCodexAppServerBridge({
   binaryPath = DEFAULT_BINARY,
   listenUrl = DEFAULT_LISTEN_URL,
-  clientInfo = { name: "dextunnel", version: "0.1.0" }
+  clientInfo = { name: "dextunnel", version: "0.1.0" },
+  fetchImpl = fetch,
+  spawnImpl = spawn,
+  WebSocketImpl = WebSocket
 } = {}) {
   const readyUrl = new URL(listenUrl.replace(/^ws/, "http"));
   readyUrl.pathname = "/readyz";
@@ -651,7 +658,7 @@ export function createCodexAppServerBridge({
 
   async function isReady() {
     try {
-      const response = await fetch(readyUrl, { method: "GET" });
+      const response = await fetchImpl(readyUrl, { method: "GET" });
       return response.ok;
     } catch {
       return false;
@@ -673,7 +680,7 @@ export function createCodexAppServerBridge({
       }
 
       lastError = null;
-      child = spawn(binaryPath, ["app-server", "--listen", listenUrl], {
+      child = spawnImpl(binaryPath, ["app-server", "--listen", listenUrl], {
         stdio: ["ignore", "pipe", "pipe"]
       });
 
@@ -719,7 +726,7 @@ export function createCodexAppServerBridge({
       const initId = 1;
       const requestId = 2;
       const notifications = [];
-      const ws = new WebSocket(listenUrl);
+      const ws = new WebSocketImpl(listenUrl);
 
       const timeout = setTimeout(() => {
         if (!settled) {
@@ -930,7 +937,7 @@ export function createCodexAppServerBridge({
       let initialized = false;
       const initId = 1;
       const resumeId = 2;
-      const ws = new WebSocket(listenUrl);
+      const ws = new WebSocketImpl(listenUrl);
 
       function send(payload) {
         if (closed || ws.readyState !== WebSocket.OPEN) {
@@ -1103,7 +1110,7 @@ export function createCodexAppServerBridge({
       const turnRequestId = 3;
       const snapshotReadId = 4;
       const notifications = [];
-      const ws = new WebSocket(listenUrl);
+      const ws = new WebSocketImpl(listenUrl);
 
       const timeout = setTimeout(() => {
         if (!settled) {
@@ -1196,6 +1203,23 @@ export function createCodexAppServerBridge({
         );
       }
 
+      function fallbackToDirectTurnStart() {
+        if (!threadId) {
+          return false;
+        }
+
+        targetThread = targetThread || {
+          cwd,
+          id: threadId,
+          turns: []
+        };
+        mode = "start";
+        activeTurnId = null;
+        stage = "turn";
+        sendTurnRequest();
+        return true;
+      }
+
       function requestFinalSnapshot(turn = null) {
         if (snapshotRequested) {
           return;
@@ -1258,6 +1282,11 @@ export function createCodexAppServerBridge({
         }
 
         if (msg.error) {
+          if (msg.id === threadSetupId && isNoRolloutFoundError(msg.error.message || "")) {
+            if (fallbackToDirectTurnStart()) {
+              return;
+            }
+          }
           if (msg.id === snapshotReadId && completedTurn) {
             finish(resolve)({
               mode,
