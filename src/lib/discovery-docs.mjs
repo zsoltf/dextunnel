@@ -388,6 +388,18 @@ function createOpenApiSchemas() {
         cwd: {
           anyOf: [{ type: "string" }, { type: "null" }]
         },
+        effort: {
+          anyOf: [{ type: "string" }, { type: "null" }]
+        },
+        model: {
+          anyOf: [{ type: "string" }, { type: "null" }]
+        },
+        reasoningEffort: {
+          anyOf: [{ type: "string" }, { type: "null" }]
+        },
+        reasoning_effort: {
+          anyOf: [{ type: "string" }, { type: "null" }]
+        },
         text: { type: "string" },
         threadId: {
           anyOf: [{ type: "string" }, { type: "null" }]
@@ -411,6 +423,22 @@ function createOpenApiSchemas() {
         },
         turn: {
           anyOf: [{ type: "object", additionalProperties: true }, { type: "null" }]
+        }
+      }
+    },
+    ModelListResponse: {
+      type: "object",
+      additionalProperties: true,
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true
+          }
+        },
+        nextCursor: {
+          anyOf: [{ type: "string" }, { type: "null" }]
         }
       }
     },
@@ -673,6 +701,37 @@ export function buildOpenApiDocument({ baseUrl = "" } = {}) {
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/BridgeStatus" }
+                }
+              }
+            }
+          }
+        })
+      },
+      "/api/codex-app-server/models": {
+        get: securedPath({
+          tags: ["read"],
+          operationId: "listModels",
+          summary: "List available Codex models and supported reasoning efforts.",
+          parameters: [
+            {
+              in: "query",
+              name: "includeHidden",
+              required: false,
+              schema: { type: "boolean" }
+            },
+            {
+              in: "query",
+              name: "limit",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 200 }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Available models and metadata.",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ModelListResponse" }
                 }
               }
             }

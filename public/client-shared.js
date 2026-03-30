@@ -411,6 +411,10 @@ function looksLikeTopicNoise(value) {
     return true;
   }
 
+  if (/^\$[A-Za-z0-9._-]+$/.test(text)) {
+    return true;
+  }
+
   return text.startsWith("[$");
 }
 
@@ -486,6 +490,147 @@ export function groupThreadsByProject(threads) {
       threads: group.threads.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     }))
     .sort((a, b) => (b.threads[0]?.updatedAt || 0) - (a.threads[0]?.updatedAt || 0));
+}
+
+function threadStatusValue(value) {
+  if (typeof value === "string") {
+    return value.trim().toLowerCase();
+  }
+
+  if (value && typeof value === "object") {
+    return String(value.type || value.status || "").trim().toLowerCase();
+  }
+
+  return "";
+}
+
+function threadTimestampValue(value) {
+  const normalized = typeof value === "number" && value < 1e12 ? value * 1000 : value;
+  const ms = new Date(normalized || 0).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function threadActiveFlags(thread = {}) {
+  return Array.isArray(thread?.status?.activeFlags)
+    ? thread.status.activeFlags.map((flag) => String(flag || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+}
+
+export function threadHasActiveTurn(thread = {}) {
+  if (!thread) {
+    return false;
+  }
+
+  if (String(thread.activeTurnId || "").trim()) {
+    return true;
+  }
+
+  const flags = threadActiveFlags(thread);
+  return [thread.activeTurnStatus, thread.status, thread.lastTurnStatus]
+    .map(threadStatusValue)
+    .some((status) => (
+      status === "inprogress" ||
+      status === "running" ||
+      (status === "active" && !flags.includes("waitingonuserinput"))
+    ));
+}
+
+export function threadPreviewSummary(thread = {}) {
+  const preview = String(thread?.preview || "").replace(/\s+/g, " ").trim();
+  if (!preview || looksLikeTopicNoise(preview)) {
+    return "";
+  }
+
+  if (/^Warning: The maximum number of unified exec processes\b/i.test(preview)) {
+    return "";
+  }
+
+  return preview;
+}
+
+export function activeThreadSummaries(threads = [], { selectedThreadId = "" } = {}) {
+  const normalizedSelectedThreadId = String(selectedThreadId || "").trim();
+
+  return (Array.isArray(threads) ? threads : [])
+    .filter((thread) => thread?.id && threadHasActiveTurn(thread))
+    .map((thread) => ({
+      ...thread,
+      isSelected: thread.id === normalizedSelectedThreadId,
+      summaryPreview: threadPreviewSummary(thread)
+    }))
+    .sort((left, right) => (
+      Number(right.isSelected) - Number(left.isSelected) ||
+      threadTimestampValue(right.updatedAt) - threadTimestampValue(left.updatedAt)
+    ));
+}
+
+const RECENT_WORKER_ACTIVITY_WINDOW_MS = 3 * 60 * 1000;
+
+export function threadStatusLabel(thread = {}, {
+  nowMs = Date.now(),
+  recentWorkerWindowMs = RECENT_WORKER_ACTIVITY_WINDOW_MS
+} = {}) {
+  const lastWorkerActivityAt = threadTimestampValue(
+    thread?.statusWorkerActivityAt || thread?.lastWorkerActivityAt || 0
+  );
+  const lastUserActivityAt = threadTimestampValue(
+    thread?.statusUserActivityAt || thread?.lastUserActivityAt || 0
+  );
+  const hasRecentWorkerActivity =
+    lastWorkerActivityAt > 0 &&
+    nowMs - lastWorkerActivityAt <= recentWorkerWindowMs &&
+    lastWorkerActivityAt >= lastUserActivityAt;
+  const flags = threadActiveFlags(thread);
+  if (flags.includes("waitingonuserinput")) {
+    return hasRecentWorkerActivity ? "waiting" : "";
+  }
+
+  if (threadHasActiveTurn(thread)) {
+    return "running";
+  }
+
+  if (hasRecentWorkerActivity) {
+    return "working";
+  }
+
+  return "";
+}
+
+export function statusThreadSummaries(threads = [], {
+  nowMs = Date.now(),
+  recentWorkerWindowMs = RECENT_WORKER_ACTIVITY_WINDOW_MS,
+  selectedThreadId = ""
+} = {}) {
+  const normalizedSelectedThreadId = String(selectedThreadId || "").trim();
+  const priority = {
+    waiting: 0,
+    running: 1,
+    working: 2
+  };
+
+  return (Array.isArray(threads) ? threads : [])
+    .map((thread) => ({
+      ...thread,
+      isSelected: thread?.id === normalizedSelectedThreadId,
+      statusLabel: threadStatusLabel(thread, { nowMs, recentWorkerWindowMs }),
+      summaryPreview: threadPreviewSummary(thread)
+    }))
+    .filter((thread) => {
+      if (!thread?.id || !thread.statusLabel) {
+        return false;
+      }
+
+      if (thread.isSelected && !["running", "waiting", "working"].includes(thread.statusLabel)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((left, right) => (
+      Number(right.isSelected) - Number(left.isSelected) ||
+      (priority[left.statusLabel] ?? 10) - (priority[right.statusLabel] ?? 10) ||
+      threadTimestampValue(right.updatedAt) - threadTimestampValue(left.updatedAt)
+    ));
 }
 
 export function shouldHideTranscriptEntry(entry) {

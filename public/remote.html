@@ -6,6 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     >
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#08131d">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6faf7">
     <title>Dextunnel Remote</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
@@ -54,6 +57,25 @@
 	                </div>
 	              </div>
 	              <div class="button-row toolbar-strip remote-top-actions" aria-label="Remote controls">
+	                <div id="status-popover-shell" class="status-popover-shell">
+	                  <button
+	                    type="button"
+	                    id="status-toggle-button"
+	                    class="command-button command-button-compact command-button-subtle status-toggle-button"
+	                    aria-expanded="false"
+	                    aria-haspopup="dialog"
+	                  >Status 0</button>
+	                  <section class="status-popover panel-hidden" id="remote-thread-status-panel" hidden>
+	                    <div class="status-popover-head">
+	                      <div>
+	                        <p class="section-kicker">Status</p>
+	                        <h2>Active threads</h2>
+	                      </div>
+	                      <span id="remote-thread-status-count" class="inline-status">0 active</span>
+	                    </div>
+	                    <div id="remote-thread-status-list" class="remote-thread-status-list"></div>
+	                  </section>
+	                </div>
 	                <button type="button" id="reply-toggle-button" class="command-button button-primary">Reply</button>
           <button type="button" id="control-toggle-button" class="command-button panel-hidden" hidden>Take Control</button>
 	                <button type="button" id="refresh-button" class="command-button command-button-compact">Refresh</button>

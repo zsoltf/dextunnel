@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  activeThreadSummaries,
   compareEntryChronology,
   compareEntryChronologyDesc,
   currentSurfaceTranscript,
@@ -16,8 +17,12 @@ import {
   formatRecoveryDuration,
   getSurfaceBootstrap,
   sessionLabel,
+  statusThreadSummaries,
   shouldHideTranscriptEntry,
-  summarizeRecentTranscript
+  summarizeRecentTranscript,
+  threadHasActiveTurn,
+  threadStatusLabel,
+  threadPreviewSummary
 } from "../public/client-shared.js";
 
 function createSessionStorage(seed = {}) {
@@ -170,6 +175,312 @@ test("formatBusyMarqueeText removes trailing dots for animated busy marquee copy
   assert.equal(formatBusyMarqueeText("Loading #dextunnel..."), "Loading #dextunnel");
   assert.equal(formatBusyMarqueeText("Switching shared room…"), "Switching shared room");
   assert.equal(formatBusyMarqueeText(""), "Loading");
+});
+
+test("threadHasActiveTurn recognizes running thread summaries", () => {
+  assert.equal(threadHasActiveTurn({ activeTurnId: "turn-1" }), true);
+  assert.equal(threadHasActiveTurn({ activeTurnStatus: "inProgress" }), true);
+  assert.equal(threadHasActiveTurn({ status: "running" }), true);
+  assert.equal(threadHasActiveTurn({ status: { type: "active" } }), true);
+  assert.equal(
+    threadHasActiveTurn({
+      status: {
+        activeFlags: ["waitingOnUserInput"],
+        type: "active"
+      }
+    }),
+    false
+  );
+  assert.equal(threadHasActiveTurn({ lastTurnStatus: "completed" }), false);
+});
+
+test("activeThreadSummaries keeps selected running threads first and trims preview text", () => {
+  const summaries = activeThreadSummaries(
+    [
+      {
+        id: "thr_idle",
+        preview: "all quiet",
+        status: "completed",
+        updatedAt: "2026-03-29T18:01:00.000Z"
+      },
+      {
+        id: "thr_other",
+        cwd: "/tmp/codex/other",
+        preview: "  agent still working through the selection flow  ",
+        status: "running",
+        updatedAt: "2026-03-29T18:04:00.000Z"
+      },
+      {
+        activeTurnId: "turn-2",
+        cwd: "/tmp/codex/dextunnel",
+        id: "thr_selected",
+        preview: "$codex-repo-bootstrap",
+        updatedAt: "2026-03-29T18:02:00.000Z"
+      }
+    ],
+    { selectedThreadId: "thr_selected" }
+  );
+
+  assert.deepEqual(
+    summaries.map((thread) => ({
+      id: thread.id,
+      isSelected: thread.isSelected,
+      summaryPreview: thread.summaryPreview
+    })),
+    [
+      {
+        id: "thr_selected",
+        isSelected: true,
+        summaryPreview: ""
+      },
+      {
+        id: "thr_other",
+        isSelected: false,
+        summaryPreview: "agent still working through the selection flow"
+      }
+    ]
+  );
+});
+
+test("threadStatusLabel only reports explicit waiting or running activity", () => {
+  const nowMs = new Date("2026-03-29T18:10:00.000Z").getTime();
+  assert.equal(
+    threadStatusLabel({
+      status: {
+        activeFlags: ["waitingOnUserInput"],
+        type: "idle"
+      },
+      statusWorkerActivityAt: "2026-03-29T18:08:00.000Z",
+      updatedAt: "2026-03-29T18:08:00.000Z"
+    }, { nowMs }),
+    "waiting"
+  );
+
+  assert.equal(
+    threadStatusLabel({
+      status: {
+        type: "running"
+      },
+      updatedAt: "2026-03-29T18:09:00.000Z"
+    }, { nowMs }),
+    "running"
+  );
+
+  assert.equal(
+    threadStatusLabel({
+      status: {
+        type: "idle"
+      },
+      statusWorkerActivityAt: "2026-03-29T18:09:00.000Z",
+      statusUserActivityAt: "2026-03-29T18:08:00.000Z",
+      updatedAt: "2026-03-29T18:09:00.000Z"
+    }, { nowMs }),
+    "working"
+  );
+
+  assert.equal(
+    threadStatusLabel({
+      status: {
+        type: "idle"
+      },
+      statusWorkerActivityAt: "2026-03-29T18:08:00.000Z",
+      statusUserActivityAt: "2026-03-29T18:09:00.000Z",
+      updatedAt: "2026-03-29T18:09:00.000Z"
+    }, { nowMs }),
+    ""
+  );
+});
+
+test("statusThreadSummaries keeps only explicit active or waiting threads", () => {
+  const nowMs = new Date("2026-03-29T18:10:00.000Z").getTime();
+  const summaries = statusThreadSummaries(
+    [
+      {
+        id: "thr_old",
+        preview: "older and settled",
+        status: {
+          type: "idle"
+        },
+        updatedAt: "2026-03-29T16:00:00.000Z"
+      },
+      {
+        id: "thr_waiting",
+        preview: "waiting on a quick answer",
+        status: {
+          activeFlags: ["waitingOnUserInput"],
+          type: "idle"
+        },
+        statusWorkerActivityAt: "2026-03-29T18:09:00.000Z",
+        updatedAt: "2026-03-29T18:09:00.000Z"
+      },
+      {
+        id: "thr_running",
+        preview: "assistant is still working",
+        status: "running",
+        updatedAt: "2026-03-29T18:08:00.000Z"
+      },
+      {
+        id: "thr_working",
+        preview: "tool output is still streaming",
+        status: {
+          type: "idle"
+        },
+        statusWorkerActivityAt: "2026-03-29T18:09:00.000Z",
+        statusUserActivityAt: "2026-03-29T18:08:00.000Z",
+        updatedAt: "2026-03-29T18:09:00.000Z"
+      },
+      {
+        id: "thr_selected",
+        preview: "latest user request",
+        status: {
+          type: "idle"
+        },
+        updatedAt: "2026-03-29T18:09:00.000Z"
+      },
+      {
+        id: "thr_not_loaded",
+        preview: "Warning: The maximum number of unified exec processes you can keep open is 60.",
+        status: {
+          type: "notLoaded"
+        },
+        updatedAt: "2026-03-29T18:09:00.000Z"
+      }
+    ],
+    {
+      nowMs,
+      selectedThreadId: "thr_selected"
+    }
+  );
+
+  assert.deepEqual(
+    summaries.map((thread) => ({
+      id: thread.id,
+      isSelected: thread.isSelected,
+      statusLabel: thread.statusLabel,
+      summaryPreview: thread.summaryPreview
+    })),
+    [
+      {
+        id: "thr_waiting",
+        isSelected: false,
+        statusLabel: "waiting",
+        summaryPreview: "waiting on a quick answer"
+      },
+      {
+        id: "thr_running",
+        isSelected: false,
+        statusLabel: "running",
+        summaryPreview: "assistant is still working"
+      },
+      {
+        id: "thr_working",
+        isSelected: false,
+        statusLabel: "working",
+        summaryPreview: "tool output is still streaming"
+      }
+    ]
+  );
+});
+
+test("statusThreadSummaries keeps the selected thread when it is still waiting", () => {
+  const nowMs = new Date("2026-03-29T18:10:00.000Z").getTime();
+  const summaries = statusThreadSummaries(
+    [
+      {
+        id: "thr_selected",
+        preview: "waiting on me",
+        status: {
+          activeFlags: ["waitingOnUserInput"],
+          type: "idle"
+        },
+        statusWorkerActivityAt: "2026-03-29T18:09:30.000Z",
+        updatedAt: "2026-03-29T18:09:30.000Z"
+      },
+      {
+        id: "thr_other",
+        preview: "assistant is still working",
+        status: "running",
+        updatedAt: "2026-03-29T18:08:00.000Z"
+      }
+    ],
+    {
+      nowMs,
+      selectedThreadId: "thr_selected"
+    }
+  );
+
+  assert.deepEqual(
+    summaries.map((thread) => ({
+      id: thread.id,
+      isSelected: thread.isSelected,
+      statusLabel: thread.statusLabel
+    })),
+    [
+      {
+        id: "thr_selected",
+        isSelected: true,
+        statusLabel: "waiting"
+      },
+      {
+        id: "thr_other",
+        isSelected: false,
+        statusLabel: "running"
+      }
+    ]
+  );
+});
+
+test("statusThreadSummaries keeps the selected thread when it is still working", () => {
+  const nowMs = new Date("2026-03-29T18:10:00.000Z").getTime();
+  const summaries = statusThreadSummaries(
+    [
+      {
+        id: "thr_selected",
+        preview: "tool output is still streaming",
+        status: {
+          type: "idle"
+        },
+        statusWorkerActivityAt: "2026-03-29T18:09:30.000Z",
+        statusUserActivityAt: "2026-03-29T18:08:00.000Z",
+        updatedAt: "2026-03-29T18:09:30.000Z"
+      },
+      {
+        id: "thr_other",
+        preview: "assistant is still working",
+        status: "running",
+        updatedAt: "2026-03-29T18:08:00.000Z"
+      }
+    ],
+    {
+      nowMs,
+      selectedThreadId: "thr_selected"
+    }
+  );
+
+  assert.deepEqual(
+    summaries.map((thread) => ({
+      id: thread.id,
+      isSelected: thread.isSelected,
+      statusLabel: thread.statusLabel
+    })),
+    [
+      {
+        id: "thr_selected",
+        isSelected: true,
+        statusLabel: "working"
+      },
+      {
+        id: "thr_other",
+        isSelected: false,
+        statusLabel: "running"
+      }
+    ]
+  );
+});
+
+test("threadPreviewSummary hides opener noise and keeps real recent copy", () => {
+  assert.equal(threadPreviewSummary({ preview: "$docs-list" }), "");
+  assert.equal(threadPreviewSummary({ preview: "latest assistant reply" }), "latest assistant reply");
 });
 
 test("operator diagnostics stay actionable and hide known non-actions", () => {

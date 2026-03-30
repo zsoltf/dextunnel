@@ -54,6 +54,10 @@ test("openapi document exposes bearer auth and the core write flow", () => {
     document.paths["/api/codex-app-server/turn"].post.operationId,
     "sendTurn"
   );
+  assert.equal(
+    document.paths["/api/codex-app-server/models"].get.operationId,
+    "listModels"
+  );
 });
 
 test("arazzo document references the openapi document and key workflows", () => {

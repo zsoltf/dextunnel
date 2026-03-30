@@ -237,6 +237,159 @@ test("readTranscriptHistoryPageFromSessionLog pages older transcript entries by 
   assert.equal(secondOlderPage.hasMore, false);
 });
 
+test("listModels forwards the request to model/list and returns the result payload", async () => {
+  const sentMessages = [];
+
+  class FakeWebSocket {
+    constructor() {
+      this.listeners = new Map();
+      queueMicrotask(() => this.emit("open", {}));
+    }
+
+    addEventListener(event, handler) {
+      const handlers = this.listeners.get(event) || [];
+      handlers.push(handler);
+      this.listeners.set(event, handlers);
+    }
+
+    close() {}
+
+    emit(event, payload) {
+      for (const handler of this.listeners.get(event) || []) {
+        handler(payload);
+      }
+    }
+
+    send(raw) {
+      const message = JSON.parse(raw);
+      sentMessages.push(message);
+
+      if (message.method === "initialize") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {}
+          })
+        }));
+        return;
+      }
+
+      if (message.method === "initialized") {
+        return;
+      }
+
+      if (message.method === "model/list") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              data: [{ id: "gpt-5.4-mini", defaultReasoningEffort: "medium" }],
+              nextCursor: null
+            }
+          })
+        }));
+      }
+    }
+  }
+
+  const bridge = createCodexAppServerBridge({
+    fetchImpl: async () => ({ ok: true }),
+    WebSocketImpl: FakeWebSocket
+  });
+
+  const result = await bridge.listModels({ includeHidden: true, limit: 25 });
+
+  assert.equal(result.data[0].id, "gpt-5.4-mini");
+  const request = sentMessages.find((entry) => entry.method === "model/list");
+  assert.equal(request.params.includeHidden, true);
+  assert.equal(request.params.limit, 25);
+});
+
+test("createCodexAppServerBridge forwards session source to app-server spawn", async () => {
+  const spawnCalls = [];
+  let readyChecks = 0;
+
+  class FakeWebSocket {
+    constructor() {
+      this.listeners = new Map();
+      queueMicrotask(() => this.emit("open", {}));
+    }
+
+    addEventListener(event, handler) {
+      const handlers = this.listeners.get(event) || [];
+      handlers.push(handler);
+      this.listeners.set(event, handlers);
+    }
+
+    close() {}
+
+    emit(event, payload) {
+      for (const handler of this.listeners.get(event) || []) {
+        handler(payload);
+      }
+    }
+
+    send(raw) {
+      const message = JSON.parse(raw);
+      if (message.method === "initialize") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {}
+          })
+        }));
+        return;
+      }
+
+      if (message.method === "initialized") {
+        return;
+      }
+
+      if (message.method === "model/list") {
+        queueMicrotask(() => this.emit("message", {
+          data: JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              data: [{ id: "gpt-5.3-codex-spark" }],
+              nextCursor: null
+            }
+          })
+        }));
+      }
+    }
+  }
+
+  const bridge = createCodexAppServerBridge({
+    sessionSource: "exec",
+    fetchImpl: async () => {
+      readyChecks += 1;
+      return { ok: readyChecks > 2 };
+    },
+    spawnImpl: (binaryPath, args) => {
+      spawnCalls.push({ binaryPath, args });
+      return {
+        exitCode: null,
+        on() {},
+        stderr: { on() {}, setEncoding() {} },
+        stdout: { on() {}, setEncoding() {} }
+      };
+    },
+    WebSocketImpl: FakeWebSocket
+  });
+
+  await bridge.listModels({ includeHidden: false, limit: 5 });
+
+  assert.equal(spawnCalls.length, 1);
+  assert.deepEqual(
+    spawnCalls[0].args,
+    ["app-server", "--listen", "ws://127.0.0.1:4321", "--session-source", "exec"]
+  );
+});
+
 test("runTurnSession falls back to direct turn start when thread resume reports no rollout", async () => {
   const sentMessages = [];
 
@@ -318,6 +471,8 @@ test("runTurnSession falls back to direct turn start when thread resume reports 
     threadId: "thr_new",
     cwd: "/tmp/codex/new",
     text: "hello",
+    model: "gpt-5.4-mini",
+    effort: "high",
     createThreadIfMissing: false,
     timeoutMs: 1000,
     waitForAcceptanceOnly: true
@@ -328,6 +483,9 @@ test("runTurnSession falls back to direct turn start when thread resume reports 
   assert.equal(session.turn.id, "turn_1");
   assert.ok(sentMessages.some((entry) => entry.method === "thread/resume"));
   assert.ok(sentMessages.some((entry) => entry.method === "turn/start"));
+  const turnStart = sentMessages.find((entry) => entry.method === "turn/start");
+  assert.equal(turnStart.params.model, "gpt-5.4-mini");
+  assert.equal(turnStart.params.effort, "high");
 });
 
 test("pageTranscriptEntries keeps a stable cursor across an in-memory transcript", () => {

@@ -281,6 +281,7 @@ test("server integration serves discovery docs and allows bearer-auth live-state
     const openapi = await openapiResponse.json();
     assert.equal(openapiResponse.ok, true);
     assert.equal(openapi.paths["/api/codex-app-server/turn"].post.operationId, "sendTurn");
+    assert.equal(openapi.paths["/api/codex-app-server/models"].get.operationId, "listModels");
 
     const llmsResponse = await fetch(`${server.url}/llms.txt`);
     const llms = await llmsResponse.text();
@@ -302,6 +303,16 @@ test("server integration serves discovery docs and allows bearer-auth live-state
     const liveState = await liveStateResponse.json();
     assert.equal(liveStateResponse.ok, true);
     assert.equal(liveState.selectedThreadId, "thr_dextunnel");
+
+    const modelsResponse = await fetch(`${server.url}/api/codex-app-server/models?limit=5`, {
+      headers: {
+        Authorization: `Bearer ${bootstrap.accessToken}`
+      }
+    });
+    const models = await modelsResponse.json();
+    assert.equal(modelsResponse.ok, true);
+    assert.equal(Array.isArray(models.data), true);
+    assert.equal(models.data.some((entry) => entry.id === "gpt-5.4-mini"), true);
   } finally {
     await server.close();
   }

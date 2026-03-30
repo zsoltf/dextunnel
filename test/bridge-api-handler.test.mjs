@@ -108,6 +108,40 @@ test("bridge api handler serves live state through the extracted route seam", as
   ]);
 });
 
+test("bridge api handler serves the model list through the extracted route seam", async () => {
+  const sent = [];
+  const handled = await handleBridgeApiRequest({
+    req: { headers: {}, method: "GET" },
+    res: {},
+    url: new URL("http://localhost/api/codex-app-server/models?includeHidden=1&limit=25"),
+    deps: createDeps({
+      codexAppServer: {
+        listModels: async (params) => {
+          assert.deepEqual(params, { includeHidden: true, limit: 25 });
+          return {
+            data: [{ id: "gpt-5.4-mini", defaultReasoningEffort: "medium" }],
+            nextCursor: null
+          };
+        }
+      },
+      sendJson: (_res, statusCode, payload) => {
+        sent.push({ payload, statusCode });
+      }
+    })
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(sent, [
+    {
+      payload: {
+        data: [{ id: "gpt-5.4-mini", defaultReasoningEffort: "medium" }],
+        nextCursor: null
+      },
+      statusCode: 200
+    }
+  ]);
+});
+
 test("bridge api handler serves install preflight without surface auth", async () => {
   const sent = [];
   const handled = await handleBridgeApiRequest({
@@ -539,7 +573,9 @@ test("bridge api handler returns a compact send response instead of echoing the 
       },
       readJsonBody: async () => ({
         text: "hello",
-        threadId: "thr_dextunnel"
+        threadId: "thr_dextunnel",
+        model: "gpt-5.4-mini",
+        reasoningEffort: "high"
       }),
       requireSurfaceCapability: () => ({
         capabilities: ["send_turn", "control_remote"],
@@ -559,6 +595,8 @@ test("bridge api handler returns a compact send response instead of echoing the 
   assert.equal(sent[0].payload.thread.turns, undefined);
   assert.equal(sent[0].payload.turn.id, "turn_1");
   assert.equal(sendCalls[0].waitForCompletion, false);
+  assert.equal(sendCalls[0].model, "gpt-5.4-mini");
+  assert.equal(sendCalls[0].effort, "high");
 });
 
 test("bridge api handler reuses the current watcher after send and merges duplicate snapshot copies", async () => {

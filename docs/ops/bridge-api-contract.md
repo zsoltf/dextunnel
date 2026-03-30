@@ -112,6 +112,7 @@ Diagnostics note:
 - `GET /api/state`
 - `GET /api/codex-app-server/live-state`
 - `GET /api/codex-app-server/status`
+- `GET /api/codex-app-server/models`
 - `GET /api/codex-app-server/changes`
 - `GET /api/codex-app-server/threads`
 - `GET /api/codex-app-server/thread`
@@ -141,6 +142,11 @@ Transport note:
 - `POST /api/codex-app-server/turn`
 - `POST /api/codex-app-server/companion`
 - `POST /api/codex-app-server/agent-room`
+
+Turn-send note:
+- `POST /api/codex-app-server/turn` accepts optional `model` and `effort` fields.
+- Dextunnel also accepts `reasoningEffort` and `reasoning_effort` as compatibility aliases for `effort`.
+- These values flow through to the underlying Codex `turn/start` call, so they can set the default model and reasoning effort for later turns on the same thread.
 
 ### Dev-only
 

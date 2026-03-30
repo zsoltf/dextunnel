@@ -190,6 +190,22 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
       return true;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/codex-app-server/models") {
+      try {
+        requireSurfaceCapability(req, url, "read_room");
+        const includeHidden = url.searchParams.get("includeHidden") === "1";
+        const limit = Number(url.searchParams.get("limit") || "50");
+        const payload = await codexAppServer.listModels({
+          includeHidden,
+          limit: Number.isFinite(limit) && limit > 0 ? limit : 50
+        });
+        sendJson(res, 200, payload);
+      } catch (error) {
+        sendJson(res, errorStatusCode(error, 500), { error: error.message, status: buildBridgeStatus() });
+      }
+      return true;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/codex-app-server/changes") {
       try {
         requireSurfaceCapability(req, url, "read_room");
@@ -615,6 +631,15 @@ export async function handleBridgeApiRequest({ req, res, url, deps }) {
           cwd: targetCwd,
           text: body.text || "",
           attachments,
+          model:
+            typeof body.model === "string" && body.model.trim()
+              ? body.model.trim()
+              : null,
+          effort:
+            typeof (body.effort || body.reasoningEffort || body.reasoning_effort) === "string" &&
+            String(body.effort || body.reasoningEffort || body.reasoning_effort).trim()
+              ? String(body.effort || body.reasoningEffort || body.reasoning_effort).trim()
+              : null,
           createThreadIfMissing: body.createThreadIfMissing !== false,
           waitForCompletion: false,
           timeoutMs: Number(body.timeoutMs || 45000)

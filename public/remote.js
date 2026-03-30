@@ -65,6 +65,8 @@ import {
   renderTranscriptCard,
   shortThreadId,
   stableSurfaceClientId,
+  statusThreadSummaries,
+  threadPreviewSummary,
   threadDisplayTitle,
   shouldHideTranscriptEntry,
   startTicker,
@@ -80,11 +82,15 @@ const companionUrl = "/api/codex-app-server/companion";
 const interactionUrl = "/api/codex-app-server/interaction";
 const turnUrl = "/api/codex-app-server/turn";
 const changesUrl = "/api/codex-app-server/changes";
+const threadsUrl = "/api/codex-app-server/threads";
+const threadUrl = "/api/codex-app-server/thread";
 const presenceUrl = "/api/codex-app-server/presence";
 const transcriptHistoryUrl = "/api/codex-app-server/transcript-history";
 const stateUrl = "/api/state";
 const FALLBACK_REFRESH_INTERVAL_MS = 6000;
 const FALLBACK_REFRESH_STALE_MS = 14000;
+const THREAD_STATUS_REFRESH_INTERVAL_MS = 15000;
+const THREAD_STATUS_SELF_HEAL_INTERVAL_MS = 5000;
 const CONTROL_RENEW_INTERVAL_MS = 30000;
 const CONTROL_RENEW_ACTIVE_WINDOW_MS = 90000;
 const PRESENCE_HEARTBEAT_INTERVAL_MS = 12000;
@@ -98,6 +104,10 @@ const TRANSCRIPT_HISTORY_BOTTOM_THRESHOLD_PX = 220;
 const TRANSCRIPT_HISTORY_RESUME_SCROLL_DELTA_PX = 28;
 const FEED_STICKY_TOP_THRESHOLD_PX = 96;
 const SIDEBAR_MOBILE_BREAKPOINT_PX = 1180;
+const THREAD_STATUS_POPOVER_MARGIN_PX = 12;
+const THREAD_STATUS_POPOVER_OFFSET_PX = 8;
+const THREAD_STATUS_POPOVER_MAX_WIDTH_PX = 420;
+const THREAD_STATUS_POPOVER_MIN_HEIGHT_PX = 180;
 const DRAFT_STORAGE_PREFIX = "dextunnel:draft:";
 const QUEUE_STORAGE_PREFIX = "dextunnel:queue:";
 const IOS_FOCUS_PLATFORM_REGEX = /iPad|iPhone|iPod/;
@@ -110,6 +120,13 @@ let currentSnapshot = null;
 let currentLiveState = null;
 let renderedThreadId = null;
 let hasRenderedOnce = false;
+let isThreadStatusOpen = false;
+let threadStatusRefreshPromise = null;
+let threadStatusRefreshTimer = null;
+let threadStatusHydrationPromise = null;
+let threadStatusHydrationKey = "";
+let threadStatusLastAttemptAt = 0;
+let threadStatusLastSyncAt = 0;
 let isComposerOpen = false;
 let isSendingReply = false;
 let pendingOutgoingText = "";
@@ -179,6 +196,7 @@ const expandedEntryKeys = new Set();
 const seenCardKeys = new Set();
 const queuedRepliesByThreadId = new Map();
 const transcriptHistoryByThreadId = new Map();
+const threadStatusDetailsById = new Map();
 const bridgeState = createLiveBridgeLifecycleState({
   bootstrapRetryBaseMs: BOOTSTRAP_RETRY_BASE_MS,
   streamRecoveryBaseMs: STREAM_RECOVERY_BASE_MS
@@ -234,7 +252,12 @@ const nodes = {
   operatorDiagnostics: document.querySelector("#remote-operator-diagnostics"),
   refreshButton: document.querySelector("#refresh-button"),
   remoteScopeNote: document.querySelector("#remote-scope-note"),
+  statusPopoverShell: document.querySelector("#status-popover-shell"),
+  statusToggleButton: document.querySelector("#status-toggle-button"),
   remoteWindow: document.querySelector("#remote-window"),
+  threadStatusCount: document.querySelector("#remote-thread-status-count"),
+  threadStatusList: document.querySelector("#remote-thread-status-list"),
+  threadStatusPanel: document.querySelector("#remote-thread-status-panel"),
   statusPanel: document.querySelector("#remote-status-panel"),
   sidebar: document.querySelector("#remote-sidebar"),
   sidebarGroups: document.querySelector("#remote-sidebar-groups"),
@@ -249,6 +272,14 @@ const nodes = {
   queueReplyButton: document.querySelector("#queue-reply-button"),
   sendReplyButton: document.querySelector("#send-reply-button")
 };
+
+function mountThreadStatusPopover() {
+  if (!nodes.threadStatusPanel || nodes.threadStatusPanel.parentElement === document.body) {
+    return;
+  }
+
+  document.body.appendChild(nodes.threadStatusPanel);
+}
 
 function isIosTouchDevice() {
   if (typeof navigator === "undefined") {
@@ -300,6 +331,7 @@ function focusReplyTextAtEnd() {
 }
 
 configureIosViewport();
+mountThreadStatusPopover();
 
 const marqueeTicker = startTicker(nodes.marquee, [
   "initializing session bridge...",
@@ -1967,6 +1999,428 @@ function renderSidebar() {
   );
 }
 
+function cacheThreadStatusDetails(threads = []) {
+  for (const thread of Array.isArray(threads) ? threads : []) {
+    const threadId = String(thread?.id || "").trim();
+    if (!threadId) {
+      continue;
+    }
+
+    const details = {};
+    if (String(thread?.statusWorkerActivityAt || "").trim()) {
+      details.statusWorkerActivityAt = String(thread.statusWorkerActivityAt).trim();
+    }
+    if (String(thread?.statusUserActivityAt || "").trim()) {
+      details.statusUserActivityAt = String(thread.statusUserActivityAt).trim();
+    }
+
+    if (Object.keys(details).length) {
+      threadStatusDetailsById.set(threadId, details);
+    }
+  }
+}
+
+function threadsWithCachedStatusDetails(threads = []) {
+  return (Array.isArray(threads) ? threads : []).map((thread) => ({
+    ...thread,
+    ...(threadStatusDetailsById.get(thread?.id) || {})
+  }));
+}
+
+function threadStatusHydrationCandidates(threads = []) {
+  const selectedThreadId = String(currentLiveState?.selectedThreadId || "").trim();
+  const candidates = [];
+  const seen = new Set();
+
+  if (selectedThreadId) {
+    const selectedThread = (threads || []).find((thread) => thread?.id === selectedThreadId);
+    if (selectedThread) {
+      seen.add(selectedThreadId);
+      candidates.push(selectedThread);
+    }
+  }
+
+  for (const thread of Array.isArray(threads) ? threads : []) {
+    const threadId = String(thread?.id || "").trim();
+    if (!threadId || seen.has(threadId)) {
+      continue;
+    }
+    seen.add(threadId);
+    candidates.push(thread);
+    if (candidates.length >= 6) {
+      break;
+    }
+  }
+
+  return candidates;
+}
+
+function maybeHydrateThreadStatusThreads(threads = [], { force = false } = {}) {
+  const baseThreads = threadsWithCachedStatusDetails(threads);
+  const candidates = threadStatusHydrationCandidates(baseThreads);
+  if (!candidates.length) {
+    return null;
+  }
+
+  const nextKey = candidates
+    .map((thread) => `${thread.id}:${thread.updatedAt || ""}`)
+    .join("|");
+  if (!force && (threadStatusHydrationPromise || nextKey === threadStatusHydrationKey)) {
+    return threadStatusHydrationPromise;
+  }
+
+  threadStatusHydrationKey = nextKey;
+  threadStatusHydrationPromise = hydrateThreadStatusThreads(baseThreads)
+    .then((hydratedThreads) => {
+      cacheThreadStatusDetails(hydratedThreads);
+      if (currentLiveState?.threads) {
+        currentLiveState = {
+          ...currentLiveState,
+          threads: threadsWithCachedStatusDetails(currentLiveState.threads)
+        };
+        render();
+      }
+      return hydratedThreads;
+    })
+    .finally(() => {
+      threadStatusHydrationPromise = null;
+    });
+
+  return threadStatusHydrationPromise;
+}
+
+function statusThreads() {
+  const threads = threadsWithCachedStatusDetails(currentLiveState?.threads || []);
+  void maybeHydrateThreadStatusThreads(threads);
+  return statusThreadSummaries(threads, {
+    selectedThreadId: currentLiveState?.selectedThreadId || ""
+  });
+}
+
+function viewportBounds() {
+  if (window.visualViewport) {
+    return {
+      height: window.visualViewport.height,
+      left: window.visualViewport.offsetLeft,
+      top: window.visualViewport.offsetTop,
+      width: window.visualViewport.width
+    };
+  }
+
+  return {
+    height: window.innerHeight || document.documentElement.clientHeight || 0,
+    left: 0,
+    top: 0,
+    width: window.innerWidth || document.documentElement.clientWidth || 0
+  };
+}
+
+function clampNumber(value, minimum, maximum) {
+  const safeMinimum = Number.isFinite(minimum) ? minimum : 0;
+  const safeMaximum = Number.isFinite(maximum) ? maximum : safeMinimum;
+  if (!Number.isFinite(value)) {
+    return safeMinimum;
+  }
+
+  return Math.min(Math.max(value, safeMinimum), Math.max(safeMinimum, safeMaximum));
+}
+
+function clearThreadStatusPopoverPosition() {
+  if (!nodes.threadStatusPanel) {
+    return;
+  }
+
+  nodes.threadStatusPanel.style.removeProperty("left");
+  nodes.threadStatusPanel.style.removeProperty("top");
+  nodes.threadStatusPanel.style.removeProperty("width");
+  nodes.threadStatusPanel.style.removeProperty("max-height");
+}
+
+function positionThreadStatusPopover() {
+  if (!nodes.threadStatusPanel || !nodes.statusPopoverShell || !isThreadStatusOpen || nodes.threadStatusPanel.hidden) {
+    clearThreadStatusPopoverPosition();
+    return;
+  }
+
+  const anchorRect = nodes.statusPopoverShell.getBoundingClientRect();
+  const viewport = viewportBounds();
+  const availableWidth = Math.max(220, viewport.width - THREAD_STATUS_POPOVER_MARGIN_PX * 2);
+  const width = Math.min(THREAD_STATUS_POPOVER_MAX_WIDTH_PX, availableWidth);
+  const minLeft = viewport.left + THREAD_STATUS_POPOVER_MARGIN_PX;
+  const maxLeft = viewport.left + viewport.width - THREAD_STATUS_POPOVER_MARGIN_PX - width;
+  const left = clampNumber(anchorRect.right - width, minLeft, maxLeft);
+  const top = Math.max(
+    viewport.top + THREAD_STATUS_POPOVER_MARGIN_PX,
+    anchorRect.bottom + THREAD_STATUS_POPOVER_OFFSET_PX
+  );
+  const maxHeight = Math.max(
+    THREAD_STATUS_POPOVER_MIN_HEIGHT_PX,
+    viewport.top + viewport.height - top - THREAD_STATUS_POPOVER_MARGIN_PX
+  );
+
+  nodes.threadStatusPanel.style.left = `${Math.round(left)}px`;
+  nodes.threadStatusPanel.style.top = `${Math.round(top)}px`;
+  nodes.threadStatusPanel.style.width = `${Math.round(width)}px`;
+  nodes.threadStatusPanel.style.maxHeight = `${Math.round(maxHeight)}px`;
+}
+
+function clearThreadStatusRefreshTimer() {
+  if (!threadStatusRefreshTimer) {
+    return;
+  }
+
+  window.clearTimeout(threadStatusRefreshTimer);
+  threadStatusRefreshTimer = null;
+}
+
+function scheduleThreadStatusRefresh({ immediate = false } = {}) {
+  clearThreadStatusRefreshTimer();
+  if (!isThreadStatusOpen || document.visibilityState === "hidden") {
+    return;
+  }
+
+  threadStatusRefreshTimer = window.setTimeout(() => {
+    threadStatusRefreshTimer = null;
+    void refreshThreadStatusSummaries({ background: true });
+  }, immediate ? 0 : THREAD_STATUS_REFRESH_INTERVAL_MS);
+}
+
+function threadStatusActivityFromSnapshot(snapshot = null) {
+  const transcript = Array.isArray(snapshot?.transcript) ? snapshot.transcript : [];
+  let lastUserActivityAt = 0;
+  let lastWorkerActivityAt = 0;
+
+  for (const entry of transcript) {
+    const timestamp = new Date(entry?.timestamp || 0).getTime();
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      continue;
+    }
+
+    const participantRole = String(entry?.participant?.role || "").trim().toLowerCase();
+    const role = String(entry?.role || "").trim().toLowerCase();
+    const isUser = role === "user" || participantRole === "live";
+    if (isUser) {
+      lastUserActivityAt = Math.max(lastUserActivityAt, timestamp);
+      continue;
+    }
+
+    const isWorkerActivity =
+      role === "assistant" ||
+      role === "tool" ||
+      participantRole === "tool" ||
+      participantRole === "system";
+    if (isWorkerActivity) {
+      lastWorkerActivityAt = Math.max(lastWorkerActivityAt, timestamp);
+    }
+  }
+
+  return {
+    statusUserActivityAt: lastUserActivityAt > 0 ? new Date(lastUserActivityAt).toISOString() : "",
+    statusWorkerActivityAt: lastWorkerActivityAt > 0 ? new Date(lastWorkerActivityAt).toISOString() : ""
+  };
+}
+
+async function hydrateThreadStatusThreads(threads = []) {
+  const orderedThreads = Array.isArray(threads) ? threads.slice() : [];
+  const candidateIds = [];
+
+  for (const thread of orderedThreads) {
+    const threadId = String(thread?.id || "").trim();
+    if (!threadId || candidateIds.includes(threadId)) {
+      continue;
+    }
+    candidateIds.push(threadId);
+    if (candidateIds.length >= 6) {
+      break;
+    }
+  }
+
+  const detailEntries = await Promise.all(
+    candidateIds.map(async (threadId) => {
+      try {
+        if (threadId === currentLiveState?.selectedThreadSnapshot?.thread?.id && currentLiveState?.selectedThreadSnapshot) {
+          return [threadId, threadStatusActivityFromSnapshot(currentLiveState.selectedThreadSnapshot)];
+        }
+
+        const query = new URLSearchParams({
+          limit: "24",
+          threadId
+        });
+        const payload = await requestJson(`${threadUrl}?${query.toString()}`);
+        return [threadId, threadStatusActivityFromSnapshot(payload?.snapshot || null)];
+      } catch {
+        return [threadId, null];
+      }
+    })
+  );
+
+  const detailMap = new Map(detailEntries.filter((entry) => entry?.[1]));
+  return orderedThreads.map((thread) => ({
+    ...thread,
+    ...(detailMap.get(thread?.id) || {})
+  }));
+}
+
+function renderThreadStatusPanel() {
+  const entries = statusThreads();
+  const count = entries.length;
+  const countLabel = count === 1 ? "1 active" : `${count} active`;
+  const hasLiveState = Boolean(currentLiveState);
+  const syncing = Boolean(threadStatusRefreshPromise);
+
+  maybeRefreshThreadStatusInBackground(entries, { hasLiveState });
+
+  if (nodes.statusToggleButton) {
+    nodes.statusToggleButton.textContent = `Status ${count}`;
+    nodes.statusToggleButton.setAttribute("aria-expanded", isThreadStatusOpen ? "true" : "false");
+    nodes.statusToggleButton.classList.toggle("button-primary", count === 0 && isThreadStatusOpen);
+    nodes.statusToggleButton.classList.toggle("button-attention", count > 0);
+    nodes.statusToggleButton.classList.toggle("is-syncing", syncing);
+  }
+
+  nodes.threadStatusCount.textContent = !hasLiveState ? "Loading..." : syncing && !count ? "Scanning..." : countLabel;
+
+  if (!isThreadStatusOpen) {
+    setPanelHidden(nodes.threadStatusPanel, true);
+    setHtmlIfChanged(nodes.threadStatusList, "", "thread-status:closed");
+    clearThreadStatusPopoverPosition();
+    return;
+  }
+
+  setPanelHidden(nodes.threadStatusPanel, false);
+
+  if (!hasLiveState) {
+    setHtmlIfChanged(
+      nodes.threadStatusList,
+      '<div class="remote-thread-status-empty">Loading thread status...</div>',
+      "thread-status:loading"
+    );
+    window.requestAnimationFrame(positionThreadStatusPopover);
+    return;
+  }
+
+  if (!entries.length) {
+    const emptyLabel = syncing
+      ? "Checking active threads..."
+      : threadStatusLastSyncAt > 0
+        ? "No active threads right now."
+        : "Checking active threads...";
+    setHtmlIfChanged(
+      nodes.threadStatusList,
+      `<div class="remote-thread-status-empty">${escapeHtml(emptyLabel)}</div>`,
+      `thread-status:empty:${syncing ? "syncing" : "idle"}`
+    );
+    window.requestAnimationFrame(positionThreadStatusPopover);
+    return;
+  }
+
+  const html = entries
+    .map((thread) => {
+      const preview = thread.summaryPreview || "Recent activity with no preview yet.";
+      const stateLabel = thread.statusLabel || "recent";
+      const stamp = formatSessionTimestamp(thread.updatedAt || 0) || "recent";
+      return `
+        <button
+          type="button"
+          class="remote-thread-status-row${thread.isSelected ? " is-selected" : ""}"
+          data-status-thread-id="${escapeHtml(thread.id)}"
+          data-status-cwd="${escapeHtml(thread.cwd || "")}"
+          ${uiState.selecting ? "disabled" : ""}
+        >
+          <div class="remote-thread-status-row-head">
+            <div class="remote-thread-status-row-copy">
+              <span class="remote-thread-status-row-title">${escapeHtml(threadDisplayTitle(thread))}</span>
+              <span class="remote-thread-status-row-project">${escapeHtml(projectLabel(thread.cwd || ""))}</span>
+            </div>
+            <span class="inline-status remote-thread-status-row-pill">${escapeHtml(stateLabel)}</span>
+          </div>
+          <p class="remote-thread-status-row-preview">${escapeHtml(preview)}</p>
+          <div class="remote-thread-status-row-meta">
+            <span>${escapeHtml(stamp)}</span>
+            <span>${escapeHtml(shortThreadId(thread.id))}</span>
+          </div>
+        </button>
+      `;
+    })
+    .join("");
+
+  setHtmlIfChanged(
+    nodes.threadStatusList,
+    html,
+    `thread-status:${JSON.stringify(entries.map((thread) => ({
+      id: thread.id,
+      isSelected: thread.isSelected,
+      preview: thread.summaryPreview,
+      statusLabel: thread.statusLabel,
+      title: threadDisplayTitle(thread),
+      updatedAt: thread.updatedAt || ""
+    })))}:${uiState.selecting ? "disabled" : "ready"}`
+  );
+
+  window.requestAnimationFrame(positionThreadStatusPopover);
+}
+
+function maybeRefreshThreadStatusInBackground(entries = [], { hasLiveState = Boolean(currentLiveState) } = {}) {
+  if (!hasLiveState || document.visibilityState === "hidden" || threadStatusRefreshPromise) {
+    return;
+  }
+
+  const threads = Array.isArray(currentLiveState?.threads) ? currentLiveState.threads : [];
+  if (!threads.length) {
+    return;
+  }
+
+  const nowMs = Date.now();
+  const attemptAgeMs = threadStatusLastAttemptAt > 0 ? nowMs - threadStatusLastAttemptAt : Number.POSITIVE_INFINITY;
+  const syncAgeMs = threadStatusLastSyncAt > 0 ? nowMs - threadStatusLastSyncAt : Number.POSITIVE_INFINITY;
+  const shouldRecoverEmptyCount = entries.length === 0 && attemptAgeMs >= THREAD_STATUS_SELF_HEAL_INTERVAL_MS;
+  const shouldMaintainOpenPanel = isThreadStatusOpen && syncAgeMs >= THREAD_STATUS_REFRESH_INTERVAL_MS;
+
+  if (!shouldRecoverEmptyCount && !shouldMaintainOpenPanel) {
+    return;
+  }
+
+  void refreshThreadStatusSummaries({ background: true });
+}
+
+async function refreshThreadStatusSummaries({ background = false } = {}) {
+  if (!currentLiveState) {
+    return null;
+  }
+
+  if (threadStatusRefreshPromise) {
+    return threadStatusRefreshPromise;
+  }
+
+  threadStatusLastAttemptAt = Date.now();
+  threadStatusRefreshPromise = requestJson(threadsUrl)
+    .then(async (payload) => {
+      const nextThreads = await hydrateThreadStatusThreads(Array.isArray(payload?.data) ? payload.data : []);
+      cacheThreadStatusDetails(nextThreads);
+      currentLiveState = {
+        ...currentLiveState,
+        threads: threadsWithCachedStatusDetails(nextThreads)
+      };
+      threadStatusLastSyncAt = Date.now();
+      render();
+      return payload;
+    })
+    .catch((error) => {
+      if (background) {
+        return null;
+      }
+      throw error;
+    })
+    .finally(() => {
+      threadStatusRefreshPromise = null;
+      render();
+      scheduleThreadStatusRefresh();
+    });
+
+  render();
+  return threadStatusRefreshPromise;
+}
+
 function sessionBlockedReason() {
   const liveThread = currentLiveState?.selectedThreadSnapshot?.thread || null;
   const status = currentLiveState?.status || null;
@@ -2541,6 +2995,7 @@ function render() {
   queuedRepliesForThread();
   renderSidebar();
   renderStatuses();
+  renderThreadStatusPanel();
   renderActionPanel();
   renderAttachments();
   renderQueuePanel();
@@ -3372,7 +3827,53 @@ nodes.sidebarOverlay?.addEventListener("click", () => {
   render();
 });
 
+nodes.statusToggleButton?.addEventListener("click", async () => {
+  markUserIntent();
+  isThreadStatusOpen = !isThreadStatusOpen;
+  render();
+
+  if (!isThreadStatusOpen) {
+    clearThreadStatusRefreshTimer();
+    return;
+  }
+
+  try {
+    await refreshThreadStatusSummaries();
+  } catch (error) {
+    setTransientUiNotice(error.message || "Could not refresh thread status.", "error", 2200);
+    render();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!isThreadStatusOpen) {
+    return;
+  }
+
+  if (nodes.statusPopoverShell?.contains(event.target) || nodes.threadStatusPanel?.contains(event.target)) {
+    return;
+  }
+
+  isThreadStatusOpen = false;
+  clearThreadStatusRefreshTimer();
+  render();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !isThreadStatusOpen) {
+    return;
+  }
+
+  isThreadStatusOpen = false;
+  clearThreadStatusRefreshTimer();
+  render();
+});
+
 window.addEventListener("resize", () => {
+  if (isThreadStatusOpen) {
+    window.requestAnimationFrame(positionThreadStatusPopover);
+  }
+
   const mobileLayout = isMobileSidebarLayout();
   if (mobileLayout === lastSidebarMobileLayout) {
     return;
@@ -3385,6 +3886,35 @@ window.addEventListener("resize", () => {
     setSidebarExpanded(surfaceViewState.loadSidebarMode() !== "collapsed", { persist: false });
   }
   render();
+});
+
+nodes.threadStatusList?.addEventListener("click", async (event) => {
+  const target = event.target.closest("[data-status-thread-id]");
+  if (!(target instanceof HTMLElement) || target.hasAttribute("disabled")) {
+    return;
+  }
+
+  const threadId = String(target.dataset.statusThreadId || "").trim();
+  const cwd = String(target.dataset.statusCwd || "").trim();
+  if (!threadId) {
+    return;
+  }
+
+  markUserIntent();
+  try {
+    await submitSelection({
+      clientId: surfaceAuthClientId,
+      cwd,
+      source: "remote",
+      threadId
+    });
+    isThreadStatusOpen = false;
+    clearThreadStatusRefreshTimer();
+    render();
+  } catch (error) {
+    setTransientUiNotice(error.message || "Could not switch threads.", "error", 2200);
+    render();
+  }
 });
 
 nodes.sidebarGroups?.addEventListener("click", async (event) => {
@@ -3733,6 +4263,7 @@ nodes.refreshButton.addEventListener("click", async () => {
   markUserIntent();
   try {
     await refreshLiveState();
+    await refreshThreadStatusSummaries({ background: true });
   } catch (error) {
     setComposerStatus(error.message, "error");
     render();
@@ -3925,16 +4456,25 @@ document.addEventListener("input", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     persistDraft();
+    clearThreadStatusRefreshTimer();
   }
   schedulePresenceSync(40, { force: true });
   if (document.visibilityState === "visible") {
     bridgeLifecycle.resumeVisible();
+    scheduleThreadStatusRefresh({ immediate: isThreadStatusOpen });
+    if (isThreadStatusOpen) {
+      window.requestAnimationFrame(positionThreadStatusPopover);
+    }
   }
 });
 
 window.addEventListener("focus", () => {
   schedulePresenceSync(40, { force: true });
   bridgeLifecycle.resumeVisible();
+  scheduleThreadStatusRefresh({ immediate: isThreadStatusOpen });
+  if (isThreadStatusOpen) {
+    window.requestAnimationFrame(positionThreadStatusPopover);
+  }
 });
 
 window.addEventListener("blur", () => {
@@ -3945,6 +4485,9 @@ window.addEventListener(
   "scroll",
   () => {
     maybeLoadOlderTranscriptHistory();
+    if (isThreadStatusOpen) {
+      window.requestAnimationFrame(positionThreadStatusPopover);
+    }
   },
   { passive: true }
 );
@@ -3952,6 +4495,7 @@ window.addEventListener(
 window.addEventListener("pagehide", () => {
   persistDraft();
   sendDetachPresence();
+  clearThreadStatusRefreshTimer();
   closeStream();
 });
 

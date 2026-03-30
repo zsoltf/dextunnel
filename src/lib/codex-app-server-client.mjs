@@ -635,6 +635,7 @@ export function getWritableTurnStrategy(thread) {
 export function createCodexAppServerBridge({
   binaryPath = DEFAULT_BINARY,
   listenUrl = DEFAULT_LISTEN_URL,
+  sessionSource = process.env.DEXTUNNEL_CODEX_APP_SERVER_SESSION_SOURCE || null,
   clientInfo = { name: "dextunnel", version: "0.1.0" },
   fetchImpl = fetch,
   spawnImpl = spawn,
@@ -680,7 +681,11 @@ export function createCodexAppServerBridge({
       }
 
       lastError = null;
-      child = spawnImpl(binaryPath, ["app-server", "--listen", listenUrl], {
+      const args = ["app-server", "--listen", listenUrl];
+      if (typeof sessionSource === "string" && sessionSource.trim()) {
+        args.push("--session-source", sessionSource.trim());
+      }
+      child = spawnImpl(binaryPath, args, {
         stdio: ["ignore", "pipe", "pipe"]
       });
 
@@ -834,6 +839,20 @@ export function createCodexAppServerBridge({
     return result.data || [];
   }
 
+  async function listModels({
+    includeHidden = false,
+    limit = 50
+  } = {}) {
+    const { result } = await rpc("model/list", {
+      includeHidden,
+      limit
+    });
+    return {
+      data: Array.isArray(result?.data) ? result.data : [],
+      nextCursor: result?.nextCursor || null
+    };
+  }
+
   async function readThread(threadId, includeTurns = true) {
     const { result } = await rpc("thread/read", {
       threadId,
@@ -886,13 +905,22 @@ export function createCodexAppServerBridge({
     threadId,
     text,
     attachments = [],
-    approvalPolicy = "never"
+    approvalPolicy = "never",
+    model = null,
+    effort = null
   }) {
-    const { result } = await rpc("turn/start", {
+    const params = {
       threadId,
       input: toTurnInput({ text, attachments }),
       approvalPolicy
-    });
+    };
+    if (typeof model === "string" && model.trim()) {
+      params.model = model.trim();
+    }
+    if (typeof effort === "string" && effort.trim()) {
+      params.effort = effort.trim();
+    }
+    const { result } = await rpc("turn/start", params);
     return result.turn;
   }
 
@@ -1088,6 +1116,8 @@ export function createCodexAppServerBridge({
     cwd = process.cwd(),
     text,
     attachments = [],
+    model = null,
+    effort = null,
     createThreadIfMissing = true,
     allowSteer = false,
     approvalPolicy = "never",
@@ -1192,6 +1222,15 @@ export function createCodexAppServerBridge({
                 input: toTurnInput({ text, attachments }),
                 approvalPolicy
               };
+
+        if (mode !== "steer") {
+          if (typeof model === "string" && model.trim()) {
+            params.model = model.trim();
+          }
+          if (typeof effort === "string" && effort.trim()) {
+            params.effort = effort.trim();
+          }
+        }
 
         ws.send(
           JSON.stringify({
@@ -1406,6 +1445,8 @@ export function createCodexAppServerBridge({
     cwd = process.cwd(),
     text,
     attachments = [],
+    model = null,
+    effort = null,
     createThreadIfMissing = true,
     allowSteer = false,
     timeoutMs = 45000,
@@ -1431,6 +1472,8 @@ export function createCodexAppServerBridge({
       cwd,
       text: trimmed,
       attachments,
+      model,
+      effort,
       createThreadIfMissing,
       allowSteer,
       approvalPolicy: "never",
@@ -1524,6 +1567,7 @@ export function createCodexAppServerBridge({
         lastError
       };
     },
+    listModels,
     listThreads,
     interruptTurn,
     readThread,

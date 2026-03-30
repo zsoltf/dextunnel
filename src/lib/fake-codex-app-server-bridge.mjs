@@ -150,6 +150,45 @@ export function createFakeCodexAppServerBridge({
     return readThread(threads[0].id);
   }
 
+  async function listModels() {
+    return {
+      data: [
+        {
+          id: "gpt-5.4",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: [
+            { reasoningEffort: "low", description: "Lower latency" },
+            { reasoningEffort: "medium", description: "Balanced" },
+            { reasoningEffort: "high", description: "More deliberate" },
+            { reasoningEffort: "xhigh", description: "Deepest reasoning" }
+          ],
+          inputModalities: ["text", "image"],
+          supportsPersonality: true,
+          isDefault: true
+        },
+        {
+          id: "gpt-5.4-mini",
+          model: "gpt-5.4-mini",
+          displayName: "GPT-5.4 Mini",
+          hidden: false,
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: [
+            { reasoningEffort: "low", description: "Lower latency" },
+            { reasoningEffort: "medium", description: "Balanced" },
+            { reasoningEffort: "high", description: "More deliberate" }
+          ],
+          inputModalities: ["text", "image"],
+          supportsPersonality: true,
+          isDefault: false
+        }
+      ],
+      nextCursor: null
+    };
+  }
+
   async function startThread({
     cwd: threadCwd = cwd
   } = {}) {
@@ -176,6 +215,8 @@ export function createFakeCodexAppServerBridge({
     cwd: threadCwd = cwd,
     text = "",
     attachments = [],
+    model = null,
+    effort = null,
     createThreadIfMissing = true
   } = {}) {
     let nextThreadId = threadId;
@@ -210,7 +251,11 @@ export function createFakeCodexAppServerBridge({
             id: `item_agent_${randomUUID().slice(0, 8)}`,
             phase: "message",
             text: assistantText,
-            type: "agentMessage"
+            type: "agentMessage",
+            meta: {
+              effort: typeof effort === "string" && effort.trim() ? effort.trim() : null,
+              model: typeof model === "string" && model.trim() ? model.trim() : null
+            }
           }
         ],
         startedAt: timestamp,
@@ -313,6 +358,7 @@ export function createFakeCodexAppServerBridge({
     async interruptTurn(args) {
       return interruptTurn(args);
     },
+    listModels,
     listThreads,
     readThread,
     async resumeThread(threadId) {
