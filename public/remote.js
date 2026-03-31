@@ -2513,6 +2513,31 @@ function shouldImmediatelyRefreshChanges(previousState, nextState) {
   return false;
 }
 
+function cardHasActiveTextSelection(card) {
+  if (!card || typeof window === "undefined" || typeof window.getSelection !== "function") {
+    return false;
+  }
+
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount <= 0) {
+    return false;
+  }
+
+  const selectedText = String(selection.toString() || "").trim();
+  if (!selectedText) {
+    return false;
+  }
+
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    const range = selection.getRangeAt(index);
+    if (card.contains(range.commonAncestorContainer)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function renderStatuses() {
   const status = currentLiveState?.status || {};
   const liveThread = currentLiveState?.selectedThreadSnapshot?.thread || null;
@@ -4228,6 +4253,10 @@ nodes.feed.addEventListener("click", async (event) => {
 
   const card = event.target.closest("[data-entry-key]");
   if (!card || card.dataset.expandable !== "true") {
+    return;
+  }
+
+  if (cardHasActiveTextSelection(card)) {
     return;
   }
 
